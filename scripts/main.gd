@@ -68,7 +68,7 @@ func _ready() -> void:
 	economy = EconomyScript.new()
 	add_child(economy)
 	economy.gold_changed.connect(_on_gold_changed)
-	economy.setup(STARTING_GOLD)
+	economy.setup(level_data.starting_gold)
 	wave_manager = WaveManagerScript.new()
 	add_child(wave_manager)
 
@@ -81,6 +81,7 @@ func _ready() -> void:
 func _create_world() -> void:
 	enemy_path = GamePathScript.new()
 	enemy_path.curve = _create_enemy_curve()
+	enemy_path.set_theme(level_data.map_theme)
 	add_child(enemy_path)
 	move_child(enemy_path, 0)
 
@@ -95,6 +96,8 @@ func _create_world() -> void:
 	add_child(base)
 	base.position = Vector2(790.0, 1705.0)
 	base.z_index = 1705
+	base.max_health = level_data.base_health
+	base.health = level_data.base_health
 
 	archer = ShooterScript.new()
 	add_child(archer)
@@ -115,6 +118,10 @@ func _create_controllers() -> void:
 
 	tower_build_manager = TowerBuildManagerScript.new()
 	add_child(tower_build_manager)
+	tower_build_manager.configure_level(
+		level_data.build_spot_positions,
+		level_data.build_spot_costs
+	)
 	tower_build_manager.setup(economy, ui_controller.interface_layer, self, projectiles)
 	tower_build_manager.tower_built.connect(_on_tower_built)
 	tower_build_manager.message_requested.connect(ui_controller.set_message)
@@ -125,13 +132,8 @@ func _create_controllers() -> void:
 func _create_enemy_curve() -> Curve2D:
 	var path_curve := Curve2D.new()
 	path_curve.bake_interval = 12.0
-	path_curve.add_point(Vector2(535.0, -80.0))
-	path_curve.add_point(Vector2(470.0, 260.0))
-	path_curve.add_point(Vector2(650.0, 540.0))
-	path_curve.add_point(Vector2(440.0, 850.0))
-	path_curve.add_point(Vector2(570.0, 1160.0))
-	path_curve.add_point(Vector2(710.0, 1450.0))
-	path_curve.add_point(Vector2(790.0, 1695.0))
+	for path_point in level_data.get_path_points():
+		path_curve.add_point(path_point)
 
 	for point_index in range(path_curve.point_count):
 		if point_index > 0:
@@ -200,8 +202,9 @@ func _spawn_enemy(enemy_id: StringName) -> PathEnemy:
 	enemy.h_offset = randf_range(-38.0, 38.0)
 	enemy.setup(
 		enemy_data,
-		wave_manager.get_health_multiplier(wave),
-		wave_manager.get_speed_multiplier(wave, enemy_data.is_boss),
+		wave_manager.get_health_multiplier(wave) * level_data.wave_difficulty_multiplier,
+		wave_manager.get_speed_multiplier(wave, enemy_data.is_boss)
+			* lerpf(1.0, level_data.wave_difficulty_multiplier, 0.35),
 		wave_manager.get_reward_bonus(wave, enemy_data.is_boss)
 	)
 	enemy.defeated.connect(_on_enemy_defeated)
@@ -322,10 +325,22 @@ func _finish_victory() -> void:
 		return
 	victory_shown = true
 	_stop_combat()
-	var health_ratio: float = float(base.health) / float(maxi(1, base.max_health))
-	var stars: int = 3 if health_ratio >= 0.8 else 2 if health_ratio >= 0.5 else 1
+	var health_percent: int = int(round(
+		float(base.health) / float(maxi(1, base.max_health)) * 100.0
+	))
+	var stars: int = 1
+	if health_percent >= level_data.star_thresholds[2]:
+		stars = 3
+	elif health_percent >= level_data.star_thresholds[1]:
+		stars = 2
 	save_manager.complete_level(level_data.id, stars)
-	ui_controller.show_victory(level_data.display_name, stars, base.health, economy.total_gold_earned)
+	ui_controller.show_victory(
+		level_data.display_name,
+		stars,
+		base.health,
+		economy.total_gold_earned,
+		towers.size()
+	)
 
 
 func _pause_game() -> void:
@@ -374,7 +389,7 @@ func _prepare_restart() -> void:
 	ability_cooldown = 0.0
 	ui_controller.update_ability_cooldown(0.0)
 	wave_manager.reset()
-	economy.setup(STARTING_GOLD)
+	economy.setup(level_data.starting_gold)
 	base.reset()
 	queue_redraw()
 
@@ -397,7 +412,7 @@ func _update_ui() -> void:
 func _draw() -> void:
 	var visible_size: Vector2 = get_viewport_rect().size
 	var background_size := Vector2(maxf(WORLD_SIZE.x, visible_size.x), maxf(WORLD_SIZE.y, visible_size.y))
-	draw_rect(Rect2(Vector2.ZERO, background_size), Color("2e9c69"))
+	draw_rect(Rect2(Vector2.ZERO, background_size), level_data.get_ground_color())
 	draw_rect(Rect2(Vector2.ZERO, Vector2(background_size.x, 205.0)), Color("237b63"))
 	for x in range(45, int(background_size.x), 135):
 		for y in range(245, 1880, 170):

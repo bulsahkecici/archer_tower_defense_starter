@@ -16,6 +16,7 @@ var build_spots: Array[Vector2] = [
 	Vector2(860.0, 620.0)
 ]
 var built_spots: Array[bool] = [false, false, false, false]
+var build_spot_costs: Array[int] = BUILD_SPOT_COSTS.duplicate()
 var towers: Array[Node2D] = []
 var towers_by_spot: Array[Node2D] = [null, null, null, null]
 var economy: EconomyManager
@@ -30,6 +31,23 @@ var hovered_build_spot: int = -1
 var pressed_build_spot: int = -1
 var press_time: float = 0.0
 var input_enabled: bool = true
+
+
+func configure_level(positions: Array[Vector2], costs: Array[int]) -> bool:
+	if positions.is_empty() or positions.size() != costs.size():
+		return false
+	build_spots = positions.duplicate()
+	build_spot_costs.clear()
+	for cost in costs:
+		build_spot_costs.append(maxi(0, cost))
+	built_spots.clear()
+	built_spots.resize(build_spots.size())
+	built_spots.fill(false)
+	towers_by_spot.clear()
+	towers_by_spot.resize(build_spots.size())
+	towers_by_spot.fill(null)
+	queue_redraw()
+	return true
 
 
 func setup(
@@ -119,7 +137,7 @@ func open_tower_selection(index: int) -> bool:
 	selected_build_spot = index
 	tower_selection_panel = PanelScript.new()
 	interface_layer.add_child(tower_selection_panel)
-	tower_selection_panel.setup(BUILD_SPOT_COSTS[index], economy)
+	tower_selection_panel.setup(build_spot_costs[index], economy)
 	tower_selection_panel.tower_selected.connect(_on_tower_selected)
 	tower_selection_panel.closed.connect(_on_panel_closed)
 	message_requested.emit("Kule türünü seç")
@@ -252,7 +270,9 @@ func reset() -> void:
 		if is_instance_valid(tower):
 			tower.queue_free()
 	towers.clear()
-	towers_by_spot = [null, null, null, null]
+	towers_by_spot.clear()
+	towers_by_spot.resize(build_spots.size())
+	towers_by_spot.fill(null)
 	built_spots.fill(false)
 	hovered_build_spot = -1
 	pressed_build_spot = -1
@@ -272,7 +292,7 @@ func _draw() -> void:
 		if built_spots[index]:
 			continue
 		var spot: Vector2 = build_spots[index]
-		var affordable: bool = economy.can_afford(BUILD_SPOT_COSTS[index])
+		var affordable: bool = economy.can_afford(build_spot_costs[index])
 		var emphasis: float = 1.12 if index == hovered_build_spot else 1.0
 		if index == pressed_build_spot:
 			emphasis = 0.92
@@ -292,7 +312,7 @@ func _draw() -> void:
 		draw_string(
 			ThemeDB.fallback_font,
 			spot + Vector2(-8.0, 10.0),
-			str(BUILD_SPOT_COSTS[index]),
+			str(build_spot_costs[index]),
 			HORIZONTAL_ALIGNMENT_LEFT,
 			48.0,
 			24,

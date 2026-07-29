@@ -29,6 +29,14 @@ func _run() -> void:
 
 
 func _test_scenes_and_levels() -> void:
+	var catalog: Array[LevelData] = LevelData.create_catalog()
+	_expect(catalog.size() == 5, "LevelData kataloğu beş bölüm içermeli")
+	_expect(
+		catalog[0].map_theme != catalog[1].map_theme
+		and catalog[0].get_path_points() != catalog[1].get_path_points()
+		and catalog[0].build_spot_positions != catalog[1].build_spot_positions,
+		"Bölümler tema, rota ve BuildSpot düzeniyle ayrışmalı"
+	)
 	var menu_scene: PackedScene = load("res://scenes/main_menu.tscn")
 	var select_scene: PackedScene = load("res://scenes/level_select.tscn")
 	var game_scene: PackedScene = load("res://scenes/game.tscn")
@@ -56,6 +64,11 @@ func _test_save_manager() -> void:
 	manager.set_save_path(temp_save_path)
 	manager.reset_defaults()
 	_expect(manager.save_data(), "SaveManager kayıt oluşturmalı")
+	_expect(
+		not FileAccess.file_exists(temp_save_path + ".tmp")
+		and not FileAccess.file_exists(temp_save_path + ".bak"),
+		"Güvenli kayıt geçici dosyaları temizlemeli"
+	)
 	manager.complete_level(1, 2)
 	_expect(manager.unlocked_level == 2, "Bölüm 1 tamamlanınca bölüm 2 açılmalı")
 	_expect(manager.get_level_stars(1) == 2, "Yıldız hesabı kaydedilmeli")
@@ -81,6 +94,12 @@ func _test_pause_and_victory() -> void:
 	await process_frame
 	game.set_process(false)
 	game.archer.stop_combat()
+	_expect(
+		game.economy.gold == game.level_data.starting_gold
+		and game.base.max_health == game.level_data.base_health
+		and game.tower_build_manager.build_spot_costs == game.level_data.build_spot_costs,
+		"Seçilen LevelData ekonomi, kale ve BuildSpot sistemine uygulanmalı"
+	)
 	game._pause_game()
 	_expect(paused and is_instance_valid(game.ui_controller.pause_layer), "Pause oyunu durdurmalı ve UI açık kalmalı")
 	game._resume_game()

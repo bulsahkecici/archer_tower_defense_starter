@@ -215,6 +215,7 @@ func show_game_over(wave: int, total_gold: int) -> CanvasLayer:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var safe_rect: Rect2 = SafeAreaHelper.get_safe_rect(viewport_size)
 	var center := CenterContainer.new()
+	center.name = "SafeGameOverCenter"
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.offset_left = safe_rect.position.x
 	center.offset_top = safe_rect.position.y
@@ -289,12 +290,18 @@ func hide_pause() -> void:
 	pause_layer = null
 
 
-func show_victory(level_name: String, stars: int, health: int, total_gold: int) -> CanvasLayer:
+func show_victory(
+	level_name: String,
+	stars: int,
+	health: int,
+	total_gold: int,
+	tower_count: int = 0
+) -> CanvasLayer:
 	if is_instance_valid(victory_layer):
 		return victory_layer
 	victory_layer = _create_action_layer(
-		"BÖLÜM TAMAMLANDI\n%s\n%s\nKale: %d  Altın: %d" % [
-			level_name, "★".repeat(clampi(stars, 1, 3)), health, total_gold
+		"BÖLÜM TAMAMLANDI\n%s\n%s\nKale: %d  Altın: %d  Kule: %d" % [
+			level_name, "★".repeat(clampi(stars, 1, 3)), health, total_gold, tower_count
 		],
 		[
 			["Tekrar Oyna", func() -> void: restart_requested.emit()],
@@ -320,6 +327,13 @@ func _create_action_layer(title_text: String, actions: Array) -> CanvasLayer:
 	layer.add_child(shade)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.name = "SafeActionCenter"
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var safe_rect: Rect2 = SafeAreaHelper.get_safe_rect(viewport_size)
+	center.offset_left = safe_rect.position.x
+	center.offset_top = safe_rect.position.y
+	center.offset_right = -(viewport_size.x - safe_rect.end.x)
+	center.offset_bottom = -(viewport_size.y - safe_rect.end.y)
 	layer.add_child(center)
 	var content := VBoxContainer.new()
 	content.custom_minimum_size = Vector2(720.0, 0.0)

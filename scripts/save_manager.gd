@@ -43,10 +43,27 @@ func load_data() -> bool:
 
 
 func save_data() -> bool:
-	var file := FileAccess.open(save_path, FileAccess.WRITE)
+	var temporary_path: String = save_path + ".tmp"
+	var file := FileAccess.open(temporary_path, FileAccess.WRITE)
 	if file == null:
 		return false
 	file.store_string(JSON.stringify(to_dictionary(), "\t"))
+	file = null
+	var absolute_path: String = ProjectSettings.globalize_path(save_path)
+	var absolute_temporary_path: String = ProjectSettings.globalize_path(temporary_path)
+	var absolute_backup_path: String = absolute_path + ".bak"
+	if FileAccess.file_exists(absolute_backup_path):
+		DirAccess.remove_absolute(absolute_backup_path)
+	var had_previous_save: bool = FileAccess.file_exists(absolute_path)
+	if had_previous_save:
+		if DirAccess.rename_absolute(absolute_path, absolute_backup_path) != OK:
+			return false
+	if DirAccess.rename_absolute(absolute_temporary_path, absolute_path) != OK:
+		if had_previous_save:
+			DirAccess.rename_absolute(absolute_backup_path, absolute_path)
+		return false
+	if had_previous_save and FileAccess.file_exists(absolute_backup_path):
+		DirAccess.remove_absolute(absolute_backup_path)
 	return true
 
 
