@@ -2,6 +2,7 @@ extends Node
 class_name UIController
 
 signal restart_requested
+signal ability_requested
 
 var interface_layer: CanvasLayer
 var gold_label: Label
@@ -15,6 +16,7 @@ var boss_warning_wave: int = -1
 var gold_tween: Tween
 var base_tween: Tween
 var boss_warning_tween: Tween
+var ability_button: Button
 
 
 func setup() -> void:
@@ -85,6 +87,15 @@ func _build_hud() -> void:
 	help_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	safe_ui.add_child(help_label)
 
+	ability_button = Button.new()
+	ability_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	ability_button.position = Vector2(-330.0 - margins.z, -190.0 - margins.w)
+	ability_button.size = Vector2(300.0, 100.0)
+	ability_button.text = "OK YAĞMURU"
+	ability_button.add_theme_font_size_override("font_size", 26)
+	ability_button.pressed.connect(func() -> void: ability_requested.emit())
+	safe_ui.add_child(ability_button)
+
 
 func _create_hud_pill(parent: Control, accent: Color) -> Label:
 	var panel := PanelContainer.new()
@@ -134,6 +145,16 @@ func update_status(wave: int, health: int, active_enemies: int = -1) -> void:
 
 func set_message(text: String) -> void:
 	message_label.text = text
+
+
+func update_ability_cooldown(remaining: float) -> void:
+	if not is_instance_valid(ability_button):
+		return
+	ability_button.disabled = remaining > 0.0
+	ability_button.text = (
+		"OK YAĞMURU  %.0f" % ceil(remaining)
+		if remaining > 0.0 else "OK YAĞMURU"
+	)
 
 
 func play_base_feedback() -> void:

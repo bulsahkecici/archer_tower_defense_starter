@@ -15,6 +15,7 @@ var stats_label: Label
 var next_stats_label: Label
 var upgrade_button: Button
 var sell_button: Button
+var target_mode_selector: OptionButton
 var input_armed: bool = false
 
 
@@ -73,6 +74,16 @@ func _build_interface() -> void:
 	stats_label = _create_label(content, 28)
 	next_stats_label = _create_label(content, 26)
 
+	target_mode_selector = OptionButton.new()
+	target_mode_selector.custom_minimum_size = Vector2(520.0, 70.0)
+	target_mode_selector.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	target_mode_selector.add_item("En Yakın", ShooterUnit.TargetMode.NEAREST)
+	target_mode_selector.add_item("Yolda İlk", ShooterUnit.TargetMode.FIRST)
+	target_mode_selector.add_item("En Yüksek Can", ShooterUnit.TargetMode.HIGHEST_HEALTH)
+	target_mode_selector.add_item("En Düşük Can", ShooterUnit.TargetMode.LOWEST_HEALTH)
+	target_mode_selector.item_selected.connect(_on_target_mode_selected)
+	content.add_child(target_mode_selector)
+
 	upgrade_button = Button.new()
 	upgrade_button.custom_minimum_size = Vector2(520.0, 90.0)
 	upgrade_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -130,6 +141,15 @@ func refresh() -> void:
 		upgrade_button.text = "Maksimum Seviye"
 		upgrade_button.disabled = true
 	sell_button.text = "Sat  •  +%d Altın" % tower.get_sell_refund()
+	for index in target_mode_selector.item_count:
+		if target_mode_selector.get_item_id(index) == tower.target_mode:
+			target_mode_selector.select(index)
+			break
+
+
+func _on_target_mode_selected(index: int) -> void:
+	if is_instance_valid(tower):
+		tower.target_mode = target_mode_selector.get_item_id(index) as ShooterUnit.TargetMode
 
 
 func _on_gold_changed(_gold: int) -> void:

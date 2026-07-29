@@ -5,7 +5,16 @@ const ArrowScript = preload("res://scripts/arrow.gd")
 
 enum TowerType {
 	ARCHER,
-	CROSSBOW
+	CROSSBOW,
+	ICE,
+	BOMB
+}
+
+enum TargetMode {
+	NEAREST,
+	FIRST,
+	HIGHEST_HEALTH,
+	LOWEST_HEALTH
 }
 
 var attack_range: float = 320.0
@@ -30,6 +39,7 @@ var last_projectile: Node2D
 var projectile_parent: Node2D
 var invested_gold: int = 0
 var build_spot_index: int = -1
+var target_mode: TargetMode = TargetMode.NEAREST
 
 
 func _ready() -> void:
@@ -63,11 +73,16 @@ func setup_tower(
 	combat_enabled = true
 	combat_permanently_stopped = false
 	var tower_id: StringName = (
-		TowerData.CROSSBOW_ID
-		if tower_type == TowerType.CROSSBOW
+		TowerData.CROSSBOW_ID if tower_type == TowerType.CROSSBOW
+		else TowerData.ICE_ID if tower_type == TowerType.ICE
+		else TowerData.BOMB_ID if tower_type == TowerType.BOMB
 		else TowerData.ARCHER_ID
 	)
 	tower_data = TowerData.create_for_id(tower_id)
+	target_mode = (
+		TargetMode.HIGHEST_HEALTH if tower_type == TowerType.CROSSBOW
+		else TargetMode.FIRST
+	)
 	apply_level_stats()
 	_ensure_visual_nodes()
 	muzzle.position = Vector2(0.0, -82.0 if tower_data.is_heavy_projectile else -74.0)
@@ -142,8 +157,8 @@ func _process(delta: float) -> void:
 
 
 func _find_nearest_enemy() -> Node2D:
-	var nearest: Node2D = null
-	var nearest_distance: float = attack_range
+	var selected: Node2D = null
+	var selected_score: float = -INF
 	for node in get_tree().get_nodes_in_group("enemies"):
 		if not is_instance_valid(node) or node.is_queued_for_deletion():
 			continue
@@ -151,10 +166,19 @@ func _find_nearest_enemy() -> Node2D:
 			continue
 		var enemy := node as Node2D
 		var distance: float = global_position.distance_to(enemy.global_position)
-		if distance < nearest_distance:
-			nearest_distance = distance
-			nearest = enemy
-	return nearest
+		if distance > attack_range:
+			continue
+		var score: float = -distance
+		if target_mode == TargetMode.FIRST:
+			score = float(enemy.get("progress"))
+		elif target_mode == TargetMode.HIGHEST_HEALTH:
+			score = float(enemy.get("health"))
+		elif target_mode == TargetMode.LOWEST_HEALTH:
+			score = -float(enemy.get("health"))
+		if selected == null or score > selected_score:
+			selected = enemy
+			selected_score = score
+	return selected
 
 
 func _shoot(target: Node2D) -> void:
@@ -176,7 +200,12 @@ func _shoot(target: Node2D) -> void:
 		and tower_data != null
 		and tower_data.is_heavy_projectile
 	)
-	arrow.setup(target, damage, arrow_speed, heavy_projectile)
+	arrow.setup(
+		target, damage, arrow_speed, heavy_projectile,
+		tower_data.slow_ratio if tower_data != null else 0.0,
+		tower_data.slow_duration if tower_data != null else 0.0,
+		tower_data.explosion_radius if tower_data != null else 0.0
+	)
 	last_projectile = arrow
 
 
@@ -287,7 +316,16 @@ func _draw_rotating_visual(canvas: Node2D) -> void:
 		canvas.draw_line(Vector2(25.0, -38.0), Vector2(25.0, 2.0), Color("d8d8d8"), 2.0)
 		return
 	var is_heavy: bool = tower_data != null and tower_data.is_heavy_projectile
-	if is_heavy:
+	if tower_type == TowerType.ICE:
+		canvas.draw_rect(Rect2(Vector2(-25.0, -42.0), Vector2(50.0, 63.0)), Color("4b93aa"))
+		canvas.draw_colored_polygon(PackedVector2Array([
+			Vector2(-30.0, -40.0), Vector2(0.0, -82.0), Vector2(30.0, -40.0)
+		]), Color("9cecff"))
+	elif tower_type == TowerType.BOMB:
+		canvas.draw_rect(Rect2(Vector2(-30.0, -46.0), Vector2(60.0, 68.0)), Color("72503b"))
+		canvas.draw_circle(Vector2(0.0, -58.0), 23.0, Color("d87942"))
+		canvas.draw_line(Vector2(10.0, -80.0), Vector2(24.0, -94.0), Color("f1d083"), 5.0)
+	elif is_heavy:
 		canvas.draw_rect(Rect2(Vector2(-28.0, -48.0), Vector2(56.0, 69.0)), Color("526d96"))
 		canvas.draw_line(Vector2(-40.0, -52.0), Vector2(40.0, -52.0), Color("9ed5df"), 8.0)
 		canvas.draw_line(Vector2(-30.0, -72.0), Vector2(30.0, -32.0), Color("344a61"), 6.0)

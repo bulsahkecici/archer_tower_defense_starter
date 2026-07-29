@@ -3,6 +3,8 @@ class_name TowerData
 
 const ARCHER_ID: StringName = &"archer"
 const CROSSBOW_ID: StringName = &"crossbow"
+const ICE_ID: StringName = &"ice"
+const BOMB_ID: StringName = &"bomb"
 
 var id: StringName
 var display_name: String
@@ -21,6 +23,9 @@ var damage_multipliers: Array[float]
 var range_multipliers: Array[float]
 var fire_rate_multipliers: Array[float]
 var sell_refund_ratio: float
+var slow_ratio: float
+var slow_duration: float
+var explosion_radius: float
 
 # Backwards-compatible level-one aliases.
 var damage: float:
@@ -50,7 +55,10 @@ func _init(
 	new_damage_multipliers: Array[float] = [1.0, 1.5, 2.2],
 	new_range_multipliers: Array[float] = [1.0, 1.0714286, 1.1607143],
 	new_fire_rate_multipliers: Array[float] = [1.0, 0.875, 0.725],
-	new_sell_refund_ratio: float = 0.70
+	new_sell_refund_ratio: float = 0.70,
+	new_slow_ratio: float = 0.0,
+	new_slow_duration: float = 0.0,
+	new_explosion_radius: float = 0.0
 ) -> void:
 	id = new_id
 	display_name = new_display_name
@@ -72,6 +80,9 @@ func _init(
 		mini(range_multipliers.size(), fire_rate_multipliers.size())
 	)
 	sell_refund_ratio = clampf(new_sell_refund_ratio, 0.0, 1.0)
+	slow_ratio = clampf(new_slow_ratio, 0.0, 0.9)
+	slow_duration = maxf(0.0, new_slow_duration)
+	explosion_radius = maxf(0.0, new_explosion_radius)
 
 
 func get_damage(level: int) -> float:
@@ -117,7 +128,29 @@ static func create_crossbow() -> TowerData:
 	)
 
 
+static func create_ice() -> TowerData:
+	return TowerData.new(
+		ICE_ID, "Buz Kulesi", "Düşmanları geçici yavaşlatır",
+		6.0, 350.0, 1.05, 720.0, 20, false, &"ice", Color("72cfe8"),
+		[28, 42], [1.0, 1.55, 2.2], [1.0, 1.08, 1.16],
+		[1.0, 0.88, 0.75], 0.70, 0.25, 1.5, 0.0
+	)
+
+
+static func create_bomb() -> TowerData:
+	return TowerData.new(
+		BOMB_ID, "Bomba Kulesi", "Yüksek alan hasarı",
+		35.0, 370.0, 2.1, 620.0, 30, true, &"bomb", Color("d87942"),
+		[45, 65], [1.0, 1.5, 2.15], [1.0, 1.08, 1.16],
+		[1.0, 0.88, 0.74], 0.70, 0.0, 0.0, 95.0
+	)
+
+
 static func create_for_id(tower_id: StringName) -> TowerData:
 	if tower_id == CROSSBOW_ID:
 		return create_crossbow()
+	if tower_id == ICE_ID:
+		return create_ice()
+	if tower_id == BOMB_ID:
+		return create_bomb()
 	return create_archer()

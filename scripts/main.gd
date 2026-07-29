@@ -21,6 +21,9 @@ var intermission: float = 3.0
 var game_over: bool = false
 var active_enemy_count: int = 0
 var game_over_trigger_count: int = 0
+var ability_cooldown: float = 0.0
+const ABILITY_COOLDOWN: float = 25.0
+const ABILITY_DAMAGE: float = 20.0
 
 var base: DefenseBase
 var archer: ShooterUnit
@@ -96,6 +99,7 @@ func _create_controllers() -> void:
 	add_child(ui_controller)
 	ui_controller.setup()
 	ui_controller.restart_requested.connect(_restart_game)
+	ui_controller.ability_requested.connect(_use_arrow_rain)
 
 	tower_build_manager = TowerBuildManagerScript.new()
 	add_child(tower_build_manager)
@@ -130,6 +134,9 @@ func _create_enemy_curve() -> Curve2D:
 	return path_curve
 
 func _process(delta: float) -> void:
+	if ability_cooldown > 0.0:
+		ability_cooldown = maxf(0.0, ability_cooldown - delta)
+		ui_controller.update_ability_cooldown(ability_cooldown)
 	if game_over:
 		return
 
@@ -260,6 +267,29 @@ func _play_base_hud_feedback() -> void:
 func _show_boss_warning() -> void:
 	ui_controller.show_boss_warning(wave)
 
+
+func _use_arrow_rain() -> bool:
+	if game_over or ability_cooldown > 0.0:
+		return false
+	var targets: Array[Node] = get_tree().get_nodes_in_group("enemies")
+	if targets.is_empty():
+		return false
+	var hit_count: int = 0
+	for node in targets:
+		if hit_count >= 12:
+			break
+		if not is_instance_valid(node) or node.is_queued_for_deletion() or node.get("has_resolved") == true:
+			continue
+		var multiplier: float = 0.5 if node.get("is_boss") == true else 1.0
+		node.take_damage(ABILITY_DAMAGE * multiplier)
+		hit_count += 1
+	if hit_count == 0:
+		return false
+	ability_cooldown = ABILITY_COOLDOWN
+	ui_controller.update_ability_cooldown(ability_cooldown)
+	ui_controller.set_message("Ok Yağmuru!")
+	return true
+
 func _finish_game() -> void:
 	if game_over:
 		return
@@ -291,6 +321,8 @@ func _prepare_restart() -> void:
 	active_enemy_count = 0
 	game_over = false
 	wave = 0
+	ability_cooldown = 0.0
+	ui_controller.update_ability_cooldown(0.0)
 	wave_manager.reset()
 	economy.setup(STARTING_GOLD)
 	base.reset()

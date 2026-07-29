@@ -10,10 +10,14 @@ var panel_rect: Rect2 = Rect2()
 var panel_container: PanelContainer
 var archer_button: Button
 var crossbow_button: Button
+var ice_button: Button
+var bomb_button: Button
 var archer_cost_label: Label
 var crossbow_cost_label: Label
 var archer_data: TowerData = TowerData.create_archer()
 var crossbow_data: TowerData = TowerData.create_crossbow()
+var ice_data: TowerData = TowerData.create_ice()
+var bomb_data: TowerData = TowerData.create_bomb()
 var input_armed: bool = false
 
 
@@ -37,6 +41,10 @@ func get_tower_cost(tower_type: ShooterUnit.TowerType) -> int:
 func get_tower_data(tower_type: ShooterUnit.TowerType) -> TowerData:
 	if tower_type == ShooterUnit.TowerType.CROSSBOW:
 		return crossbow_data
+	if tower_type == ShooterUnit.TowerType.ICE:
+		return ice_data
+	if tower_type == ShooterUnit.TowerType.BOMB:
+		return bomb_data
 	return archer_data
 
 
@@ -122,6 +130,12 @@ func _build_interface() -> void:
 		func() -> void: tower_selected.emit(ShooterUnit.TowerType.CROSSBOW)
 	)
 	crossbow_cost_label = crossbow_button.get_node("Content/Cost") as Label
+
+	ice_button = _create_tower_card(cards, ice_data, false)
+	ice_button.pressed.connect(func() -> void: tower_selected.emit(ShooterUnit.TowerType.ICE))
+
+	bomb_button = _create_tower_card(cards, bomb_data, true)
+	bomb_button.pressed.connect(func() -> void: tower_selected.emit(ShooterUnit.TowerType.BOMB))
 
 	var cancel_button := Button.new()
 	cancel_button.custom_minimum_size = Vector2(300.0, 72.0)
@@ -248,6 +262,14 @@ func _refresh_affordability() -> void:
 	crossbow_cost_label.text = "● %d ALTIN" % crossbow_cost
 	archer_button.disabled = not economy.can_afford(archer_cost)
 	crossbow_button.disabled = not economy.can_afford(crossbow_cost)
+	var ice_cost: int = get_tower_cost(ShooterUnit.TowerType.ICE)
+	var bomb_cost: int = get_tower_cost(ShooterUnit.TowerType.BOMB)
+	var ice_label: Label = ice_button.get_node("Content/Cost") as Label
+	var bomb_label: Label = bomb_button.get_node("Content/Cost") as Label
+	ice_label.text = "● %d ALTIN" % ice_cost
+	bomb_label.text = "● %d ALTIN" % bomb_cost
+	ice_button.disabled = not economy.can_afford(ice_cost)
+	bomb_button.disabled = not economy.can_afford(bomb_cost)
 
 
 func _update_panel_rect() -> void:
