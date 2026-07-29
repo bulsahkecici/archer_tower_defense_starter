@@ -17,6 +17,12 @@ func setup(new_spot_cost: int, economy_manager: EconomyManager) -> void:
 	spot_cost = new_spot_cost
 	economy = economy_manager
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var panel_size := Vector2(
+		minf(860.0, viewport_size.x - 80.0),
+		minf(720.0, viewport_size.y - 180.0)
+	)
+	panel_rect = Rect2((viewport_size - panel_size) * 0.5, panel_size)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build_interface()
 	economy.gold_changed.connect(_on_gold_changed)
@@ -40,6 +46,12 @@ func _build_interface() -> void:
 	panel.position = panel_rect.position
 	panel.size = panel_rect.size
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color("17343a")
+	panel_style.border_color = Color("75b5aa")
+	panel_style.set_border_width_all(4)
+	panel_style.set_corner_radius_all(30)
+	panel.add_theme_stylebox_override("panel", panel_style)
 	add_child(panel)
 
 	var title := Label.new()
@@ -63,8 +75,9 @@ func _build_interface() -> void:
 		panel,
 		Vector2(55.0, 180.0),
 		"OKÇU KULESİ",
-		"Dengeli hasar\nHızlı atış\nOrta menzil",
-		Color("4f9e75")
+		"Hasar 10  •  Menzil 336\nAtış 0.8 sn\nDengeli ve çevik",
+		Color("4f9e75"),
+		false
 	)
 	archer_button.pressed.connect(
 		func() -> void: tower_selected.emit(ShooterUnit.TowerType.ARCHER)
@@ -75,8 +88,9 @@ func _build_interface() -> void:
 		panel,
 		Vector2(445.0, 180.0),
 		"ARBALET KULESİ",
-		"Yüksek hasar\nYavaş atış\nUzun menzil",
-		Color("526d96")
+		"Hasar 28  •  Menzil 418\nAtış 1.6 sn\nAğır ve uzun menzilli",
+		Color("526d96"),
+		true
 	)
 	crossbow_button.pressed.connect(
 		func() -> void: tower_selected.emit(ShooterUnit.TowerType.CROSSBOW)
@@ -97,12 +111,25 @@ func _create_tower_card(
 	card_position: Vector2,
 	title_text: String,
 	description: String,
-	accent: Color
+	accent: Color,
+	is_crossbow: bool
 ) -> Button:
 	var card := Button.new()
 	card.position = card_position
 	card.size = Vector2(360.0, 400.0)
 	card.text = ""
+	var normal_style := StyleBoxFlat.new()
+	normal_style.bg_color = Color(0.13, 0.22, 0.23, 0.96)
+	normal_style.border_color = accent
+	normal_style.set_border_width_all(4)
+	normal_style.set_corner_radius_all(22)
+	card.add_theme_stylebox_override("normal", normal_style)
+	var hover_style := normal_style.duplicate() as StyleBoxFlat
+	hover_style.bg_color = normal_style.bg_color.lightened(0.08)
+	card.add_theme_stylebox_override("hover", hover_style)
+	var pressed_style := normal_style.duplicate() as StyleBoxFlat
+	pressed_style.bg_color = accent.darkened(0.25)
+	card.add_theme_stylebox_override("pressed", pressed_style)
 	parent.add_child(card)
 
 	var icon := Control.new()
@@ -110,7 +137,7 @@ func _create_tower_card(
 	icon.size = Vector2(160.0, 150.0)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	icon.set_meta("accent", accent)
-	icon.draw.connect(func() -> void: _draw_tower_icon(icon, accent))
+	icon.draw.connect(func() -> void: _draw_tower_icon(icon, accent, is_crossbow))
 	card.add_child(icon)
 
 	var name_label := Label.new()
@@ -143,12 +170,18 @@ func _create_tower_card(
 	return card
 
 
-func _draw_tower_icon(icon: Control, accent: Color) -> void:
+func _draw_tower_icon(icon: Control, accent: Color, is_crossbow: bool) -> void:
 	icon.draw_circle(Vector2(80.0, 128.0), 55.0, Color(0.08, 0.11, 0.13, 0.22))
 	icon.draw_rect(Rect2(42.0, 56.0, 76.0, 82.0), accent)
-	icon.draw_colored_polygon(PackedVector2Array([
-		Vector2(28.0, 62.0), Vector2(80.0, 15.0), Vector2(132.0, 62.0)
-	]), accent.lightened(0.16))
+	if is_crossbow:
+		icon.draw_line(Vector2(27.0, 47.0), Vector2(133.0, 47.0), Color("a8dce5"), 11.0)
+		icon.draw_line(Vector2(42.0, 24.0), Vector2(118.0, 70.0), Color("263b52"), 8.0)
+		icon.draw_line(Vector2(118.0, 24.0), Vector2(42.0, 70.0), Color("263b52"), 8.0)
+	else:
+		icon.draw_colored_polygon(PackedVector2Array([
+			Vector2(28.0, 62.0), Vector2(80.0, 15.0), Vector2(132.0, 62.0)
+		]), accent.lightened(0.16))
+		icon.draw_arc(Vector2(104.0, 46.0), 28.0, -1.25, 1.25, 18, Color("8b5d2c"), 6.0)
 	icon.draw_rect(Rect2(67.0, 92.0, 26.0, 46.0), Color("413225"))
 
 

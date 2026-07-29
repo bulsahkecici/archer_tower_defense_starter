@@ -16,9 +16,12 @@ var cooldown: float = 0.0
 var is_archer: bool = false
 var level: int = 1
 var tower_type: TowerType = TowerType.ARCHER
+var combat_enabled: bool = true
+var action_tween: Tween
 
 func setup_archer() -> void:
 	is_archer = true
+	combat_enabled = true
 	attack_range = 520.0
 	damage = 2.5
 	fire_interval = 0.70
@@ -29,6 +32,7 @@ func setup_tower(
 	tower_level: int = 1
 ) -> void:
 	is_archer = false
+	combat_enabled = true
 	tower_type = new_tower_type
 	level = tower_level
 	if tower_type == TowerType.CROSSBOW:
@@ -44,6 +48,8 @@ func setup_tower(
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	if not combat_enabled:
+		return
 	cooldown -= delta
 	if cooldown > 0.0:
 		return
@@ -71,10 +77,56 @@ func _find_nearest_enemy() -> Node2D:
 	return nearest
 
 func _shoot(target: Node2D) -> void:
+	var direction: Vector2 = global_position.direction_to(target.global_position)
+	rotation = direction.angle() + PI * 0.5
+	_play_fire_animation()
 	var arrow := ArrowScript.new()
-	get_tree().current_scene.add_child(arrow)
+	var projectile_parent: Node = get_parent()
+	if projectile_parent == null:
+		projectile_parent = get_tree().current_scene
+	if projectile_parent == null:
+		arrow.queue_free()
+		return
+	projectile_parent.add_child(arrow)
 	arrow.global_position = global_position + Vector2(0.0, -22.0)
 	arrow.setup(target, damage, arrow_speed, tower_type == TowerType.CROSSBOW)
+
+func _play_fire_animation() -> void:
+	if action_tween != null and action_tween.is_valid():
+		action_tween.kill()
+	scale = Vector2.ONE
+	var recoil_scale: Vector2 = (
+		Vector2(1.14, 0.82)
+		if tower_type == TowerType.CROSSBOW and not is_archer
+		else Vector2(1.08, 0.90)
+	)
+	var recovery_time: float = 0.18 if tower_type == TowerType.CROSSBOW else 0.12
+	action_tween = create_tween()
+	action_tween.tween_property(self, "scale", recoil_scale, 0.05)
+	action_tween.tween_property(self, "scale", Vector2.ONE, recovery_time)
+
+func play_build_animation() -> void:
+	combat_enabled = false
+	if action_tween != null and action_tween.is_valid():
+		action_tween.kill()
+	scale = Vector2(0.58, 0.58)
+	modulate.a = 0.35
+	position.y += 30.0
+	var destination_y: float = position.y - 30.0
+	action_tween = create_tween()
+	action_tween.set_parallel(true)
+	action_tween.tween_property(self, "scale", Vector2.ONE, 0.28)
+	action_tween.tween_property(self, "modulate:a", 1.0, 0.22)
+	action_tween.tween_property(self, "position:y", destination_y, 0.28)
+	action_tween.set_parallel(false)
+	action_tween.tween_callback(func() -> void: combat_enabled = true)
+
+func stop_combat() -> void:
+	combat_enabled = false
+	if action_tween != null and action_tween.is_valid():
+		action_tween.kill()
+	scale = Vector2.ONE
+	cooldown = fire_interval
 
 func _draw() -> void:
 	if is_archer:

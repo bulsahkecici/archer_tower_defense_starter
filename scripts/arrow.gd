@@ -1,9 +1,14 @@
 extends Node2D
 
+const VisualEffectScript = preload("res://scripts/visual_effect.gd")
+
 var target: Node2D
 var damage: float = 2.0
 var speed: float = 700.0
 var is_heavy: bool = false
+
+func _ready() -> void:
+	add_to_group("projectiles")
 
 func setup(
 	new_target: Node2D,
@@ -27,6 +32,16 @@ func _process(delta: float) -> void:
 	global_position += direction * speed * delta
 
 	if global_position.distance_to(target.global_position) <= 20.0:
+		var hit_effect := VisualEffectScript.new()
+		var effect_parent: Node = get_parent()
+		if effect_parent == null:
+			effect_parent = get_tree().current_scene
+		if effect_parent != null:
+			effect_parent.add_child(hit_effect)
+		else:
+			hit_effect.queue_free()
+		hit_effect.global_position = target.global_position
+		hit_effect.setup_hit(is_heavy)
 		if target.has_method("take_damage"):
 			target.take_damage(damage)
 		queue_free()

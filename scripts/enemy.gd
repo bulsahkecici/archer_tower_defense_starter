@@ -1,7 +1,7 @@
 extends PathFollow2D
 class_name PathEnemy
 
-signal defeated(reward: int)
+signal defeated(reward: int, world_position: Vector2)
 signal reached_base(damage: int)
 
 var max_health: float = 10.0
@@ -12,25 +12,33 @@ var base_damage: int = 5
 var body_radius: float = 20.0
 var is_boss: bool = false
 var has_resolved: bool = false
+var enemy_id: StringName = &"normal"
+var display_name: String = ""
+var visual_type: StringName = &"normal"
+var damage_tween: Tween
+var death_tween: Tween
 
 func setup(
-	new_health: float,
-	new_speed: float,
-	new_reward: int,
-	new_damage: int,
-	new_radius: float,
-	boss: bool = false
+	enemy_data: EnemyData,
+	health_multiplier: float = 1.0,
+	speed_multiplier: float = 1.0,
+	reward_bonus: int = 0
 ) -> void:
-	max_health = new_health
+	enemy_id = enemy_data.id
+	display_name = enemy_data.display_name
+	visual_type = enemy_data.visual_type
+	max_health = enemy_data.max_health * maxf(0.01, health_multiplier)
 	health = max_health
-	speed = new_speed
-	reward = new_reward
-	base_damage = new_damage
-	body_radius = new_radius
-	is_boss = boss
+	speed = enemy_data.movement_speed * maxf(0.01, speed_multiplier)
+	reward = maxi(0, enemy_data.reward_gold + reward_bonus)
+	base_damage = maxi(0, enemy_data.base_damage)
+	body_radius = maxf(4.0, enemy_data.body_radius)
+	is_boss = enemy_data.is_boss
+	has_resolved = false
 	rotates = false
 	loop = false
-	add_to_group("enemies")
+	if not is_in_group("enemies"):
+		add_to_group("enemies")
 	queue_redraw()
 
 func _process(delta: float) -> void:
@@ -42,30 +50,92 @@ func _process(delta: float) -> void:
 	var movement: Vector2 = global_position - previous_position
 	if movement.length_squared() > 0.01:
 		rotation = movement.angle() + PI * 0.5
+	z_index = clampi(int(global_position.y), 0, 1900)
 
 	if progress_ratio >= 0.999:
-		has_resolved = true
-		reached_base.emit(base_damage)
-		queue_free()
+		resolve_at_base()
 
 func take_damage(amount: float) -> void:
 	if has_resolved:
 		return
 	health -= amount
 	if health <= 0.0:
-		has_resolved = true
-		defeated.emit(reward)
-		queue_free()
+		resolve_defeated()
 	else:
+		_play_damage_feedback()
 		queue_redraw()
 
+func resolve_defeated() -> bool:
+	if has_resolved:
+		return false
+	has_resolved = true
+	remove_from_group("enemies")
+	set_process(false)
+	if damage_tween != null and damage_tween.is_valid():
+		damage_tween.kill()
+	modulate = Color.WHITE
+	defeated.emit(reward, global_position)
+	var death_duration: float = 0.28 if is_boss else 0.20
+	death_tween = create_tween()
+	death_tween.set_parallel(true)
+	death_tween.tween_property(self, "scale", Vector2(0.12, 0.12), death_duration)
+	death_tween.tween_property(self, "modulate:a", 0.0, death_duration)
+	death_tween.tween_property(self, "position:y", position.y - 24.0, death_duration)
+	death_tween.set_parallel(false)
+	death_tween.tween_callback(queue_free)
+	return true
+
+func resolve_at_base() -> bool:
+	if has_resolved:
+		return false
+	has_resolved = true
+	remove_from_group("enemies")
+	reached_base.emit(base_damage)
+	queue_free()
+	return true
+
+func _play_damage_feedback() -> void:
+	if damage_tween != null and damage_tween.is_valid():
+		damage_tween.kill()
+	modulate = Color(1.0, 0.62, 0.58) if is_boss else Color(1.0, 0.78, 0.72)
+	scale = Vector2(1.08, 0.94)
+	damage_tween = create_tween()
+	damage_tween.set_parallel(true)
+	damage_tween.tween_property(self, "modulate", Color.WHITE, 0.12)
+	damage_tween.tween_property(self, "scale", Vector2.ONE, 0.12)
+
 func _draw() -> void:
-	var body_color := Color("b23a48") if not is_boss else Color("7b2cbf")
-	var outline_color := Color("5c1720") if not is_boss else Color("3c096c")
+	var body_color: Color = Color("b95448")
+	var outline_color: Color = Color("71302d")
+	if visual_type == &"fast":
+		body_color = Color("e09a3e")
+		outline_color = Color("7c4b20")
+	elif visual_type == &"boss":
+		body_color = Color("7350a1")
+		outline_color = Color("34234f")
 
 	draw_circle(Vector2(4.0, 7.0), body_radius, Color(0.05, 0.08, 0.09, 0.25))
-	draw_circle(Vector2.ZERO, body_radius, body_color)
+	if visual_type == &"fast":
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(0.0, -body_radius),
+			Vector2(body_radius, body_radius * 0.25),
+			Vector2(0.0, body_radius),
+			Vector2(-body_radius, body_radius * 0.25)
+		]), body_color)
+	else:
+		draw_circle(Vector2.ZERO, body_radius, body_color)
 	draw_arc(Vector2.ZERO, body_radius, 0.0, TAU, 40, outline_color, 4.0)
+	if is_boss:
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(-body_radius * 0.72, -body_radius * 0.60),
+			Vector2(-body_radius * 0.35, -body_radius * 1.18),
+			Vector2(-body_radius * 0.08, -body_radius * 0.68)
+		]), Color("d2b45f"))
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(body_radius * 0.72, -body_radius * 0.60),
+			Vector2(body_radius * 0.35, -body_radius * 1.18),
+			Vector2(body_radius * 0.08, -body_radius * 0.68)
+		]), Color("d2b45f"))
 
 	# Eyes
 	draw_circle(Vector2(-body_radius * 0.32, -body_radius * 0.12), maxf(2.5, body_radius * 0.10), Color.WHITE)
