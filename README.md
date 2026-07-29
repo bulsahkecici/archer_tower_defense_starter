@@ -15,6 +15,9 @@
 - Harici görsel veya ses dosyası gerekmez.
 - Hasar, ölüm, kule kurma, geri tepme ve altın geri bildirimleri hafif Tween'ler kullanır.
 - HUD ve seçim paneli anchor/container tabanlı mobil güvenli kenar boşluklarına sahiptir.
+- Kule tabanı sabit kalır; yalnızca `TurretHead` ve altındaki `Muzzle` hedefe döner.
+- Kule değerleri `TowerData`, HUD `UIController`, inşa akışı `TowerBuildManager` tarafından yönetilir.
+- Gerçek cihaz güvenli alanı `SafeAreaHelper` üzerinden merkezi olarak uygulanır.
 
 ## Çalıştırma
 
@@ -56,12 +59,16 @@ archer_tower_defense_starter/
     ├── main.gd
     ├── enemy_data.gd
     ├── wave_manager.gd
+    ├── tower_data.gd
     ├── enemy.gd
     ├── shooter.gd
     ├── arrow.gd
     ├── base.gd
     ├── economy_manager.gd
     ├── visual_effect.gd
+    ├── safe_area_helper.gd
+    ├── ui_controller.gd
+    ├── tower_build_manager.gd
     └── tower_selection_panel.gd
 ```
 
@@ -80,6 +87,12 @@ archer_tower_defense_starter/
 
 AŞAMA 5 görsel/runtime kontrolü için aynı komutta test yolunu
 `res://tests/stage5_runtime_test.gd` olarak değiştir.
+
+Mimari ve mobil uyumluluk regresyonu için test yolu:
+
+```text
+res://tests/refactor_runtime_test.gd
+```
 
 ## Not
 

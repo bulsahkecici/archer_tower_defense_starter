@@ -20,6 +20,7 @@ func setup(
 	damage = new_damage
 	speed = new_speed
 	is_heavy = heavy_projectile
+	set_process(true)
 	queue_redraw()
 
 func _process(delta: float) -> void:

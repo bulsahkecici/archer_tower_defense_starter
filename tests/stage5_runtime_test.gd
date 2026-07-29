@@ -88,6 +88,7 @@ func _test_projectile_and_fire_feedback(game: Node) -> void:
 
 	var tower := ShooterUnit.new()
 	game.add_child(tower)
+	tower.set_projectile_parent(game.projectiles)
 	tower.setup_tower(ShooterUnit.TowerType.CROSSBOW)
 	tower.set_process(false)
 	tower.position = Vector2(300.0, 900.0)

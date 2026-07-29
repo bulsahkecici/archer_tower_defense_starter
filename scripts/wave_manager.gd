@@ -110,7 +110,14 @@ func get_wave_composition(wave_number: int) -> Array[StringName]:
 
 
 func get_health_multiplier(wave_number: int) -> float:
-	return pow(1.12, float(maxi(1, wave_number) - 1))
+	var safe_wave: int = maxi(1, wave_number)
+	if safe_wave <= 10:
+		return pow(1.075, float(safe_wave - 1))
+	var first_ten_multiplier: float = pow(1.075, 9.0)
+	if safe_wave <= 20:
+		return first_ten_multiplier * pow(1.06, float(safe_wave - 10))
+	var first_twenty_multiplier: float = first_ten_multiplier * pow(1.06, 10.0)
+	return first_twenty_multiplier * pow(1.075, float(safe_wave - 20))
 
 
 func get_speed_multiplier(wave_number: int, is_boss: bool) -> float:
@@ -122,6 +129,26 @@ func get_reward_bonus(wave_number: int, is_boss: bool) -> int:
 	if is_boss:
 		return mini(int(maxi(1, wave_number) / 5) * 2, 12)
 	return mini(int(maxi(1, wave_number) / 6), 4)
+
+
+func get_wave_balance(wave_number: int) -> Dictionary:
+	var composition: Array[StringName] = get_wave_composition(wave_number)
+	var health_multiplier: float = get_health_multiplier(wave_number)
+	var total_health: float = 0.0
+	var total_reward: int = 0
+	for enemy_id in composition:
+		var data: EnemyData = get_enemy_data(enemy_id)
+		total_health += data.max_health * health_multiplier
+		total_reward += data.reward_gold + get_reward_bonus(wave_number, data.is_boss)
+	return {
+		"wave": wave_number,
+		"health_multiplier": health_multiplier,
+		"normal_health": get_enemy_data(NORMAL_ID).max_health * health_multiplier,
+		"fast_health": get_enemy_data(FAST_ID).max_health * health_multiplier,
+		"boss_health": get_enemy_data(BOSS_ID).max_health * health_multiplier,
+		"total_health": total_health,
+		"total_reward": total_reward
+	}
 
 
 func _append_enemies(
