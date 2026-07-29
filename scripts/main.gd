@@ -141,12 +141,16 @@ func _spawn_enemy() -> void:
 	var lane_x_values := [85.0, 190.0, 300.0, 420.0, 530.0, 635.0]
 	enemy.position = Vector2(lane_x_values.pick_random(), -35.0)
 
-	var health_multiplier: float = pow(1.18, wave - 1)
+	var health_multiplier: float = pow(1.18, float(wave - 1))
 	var enemy_health: float = 10.0 * health_multiplier
-	var enemy_speed: float = 55.0 * (1.0 + min((wave - 1) * 0.025, 0.55))
+	var enemy_speed: float = 55.0 * (
+		1.0 + minf(float(wave - 1) * 0.025, 0.55)
+	)
 	var enemy_reward := 3 + int(wave / 4)
 	var enemy_damage := 5 + int(wave / 5) * 2
-	var enemy_radius: float = 18.0 + min(wave * 0.55, 16.0)
+	var enemy_radius: float = (
+		18.0 + minf(float(wave) * 0.55, 16.0)
+	)
 
 	var is_boss := wave % 5 == 0 and spawn_remaining == 1
 	if is_boss:
