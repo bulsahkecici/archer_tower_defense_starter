@@ -3,6 +3,9 @@ class_name UIController
 
 signal restart_requested
 signal ability_requested
+signal pause_requested
+signal resume_requested
+signal next_level_requested
 
 var interface_layer: CanvasLayer
 var gold_label: Label
@@ -17,6 +20,9 @@ var gold_tween: Tween
 var base_tween: Tween
 var boss_warning_tween: Tween
 var ability_button: Button
+var pause_button: Button
+var pause_layer: CanvasLayer
+var victory_layer: CanvasLayer
 
 
 func setup() -> void:
@@ -95,6 +101,15 @@ func _build_hud() -> void:
 	ability_button.add_theme_font_size_override("font_size", 26)
 	ability_button.pressed.connect(func() -> void: ability_requested.emit())
 	safe_ui.add_child(ability_button)
+
+	pause_button = Button.new()
+	pause_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	pause_button.position = Vector2(-150.0 - margins.z, margins.y)
+	pause_button.size = Vector2(120.0, 82.0)
+	pause_button.text = "Ⅱ"
+	pause_button.add_theme_font_size_override("font_size", 30)
+	pause_button.pressed.connect(func() -> void: pause_requested.emit())
+	safe_ui.add_child(pause_button)
 
 
 func _create_hud_pill(parent: Control, accent: Color) -> Label:
@@ -254,6 +269,76 @@ func show_game_over(wave: int, total_gold: int) -> CanvasLayer:
 	return game_over_layer
 
 
+func show_pause() -> CanvasLayer:
+	if is_instance_valid(pause_layer):
+		return pause_layer
+	pause_layer = _create_action_layer("OYUN DURAKLATILDI", [
+		["Devam Et", func() -> void: resume_requested.emit()],
+		["Yeniden Başlat", func() -> void: restart_requested.emit()],
+		["Ayarlar", func() -> void: _change_scene_unpaused("res://scenes/settings.tscn")],
+		["Bölüm Seçimi", func() -> void: _change_scene_unpaused("res://scenes/level_select.tscn")],
+		["Ana Menü", func() -> void: _change_scene_unpaused("res://scenes/main_menu.tscn")]
+	])
+	pause_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	return pause_layer
+
+
+func hide_pause() -> void:
+	if is_instance_valid(pause_layer):
+		pause_layer.queue_free()
+	pause_layer = null
+
+
+func show_victory(level_name: String, stars: int, health: int, total_gold: int) -> CanvasLayer:
+	if is_instance_valid(victory_layer):
+		return victory_layer
+	victory_layer = _create_action_layer(
+		"BÖLÜM TAMAMLANDI\n%s\n%s\nKale: %d  Altın: %d" % [
+			level_name, "★".repeat(clampi(stars, 1, 3)), health, total_gold
+		],
+		[
+			["Tekrar Oyna", func() -> void: restart_requested.emit()],
+			["Sonraki Bölüm", func() -> void: next_level_requested.emit()],
+			["Bölüm Seçimi", func() -> void: _change_scene_unpaused("res://scenes/level_select.tscn")]
+		]
+	)
+	return victory_layer
+
+
+func _change_scene_unpaused(scene_path: String) -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file(scene_path)
+
+
+func _create_action_layer(title_text: String, actions: Array) -> CanvasLayer:
+	var layer := CanvasLayer.new()
+	layer.layer = 35
+	add_child(layer)
+	var shade := ColorRect.new()
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.color = Color(0.01, 0.03, 0.04, 0.86)
+	layer.add_child(shade)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(center)
+	var content := VBoxContainer.new()
+	content.custom_minimum_size = Vector2(720.0, 0.0)
+	content.add_theme_constant_override("separation", 24)
+	center.add_child(content)
+	var title := Label.new()
+	title.text = title_text
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 42)
+	content.add_child(title)
+	for action in actions:
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(580.0, 92.0)
+		button.text = String(action[0])
+		button.pressed.connect(action[1])
+		content.add_child(button)
+	return layer
+
+
 func reset() -> void:
 	boss_warning_wave = -1
 	if boss_warning_tween != null and boss_warning_tween.is_valid():
@@ -263,3 +348,7 @@ func reset() -> void:
 	if is_instance_valid(game_over_layer):
 		game_over_layer.queue_free()
 	game_over_layer = null
+	hide_pause()
+	if is_instance_valid(victory_layer):
+		victory_layer.queue_free()
+	victory_layer = null

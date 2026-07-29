@@ -11,8 +11,13 @@ config_version=5
 [application]
 
 config/name="Archer Tower Defense Starter"
-run/main_scene="res://main.tscn"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.7")
+
+[autoload]
+
+SaveManager="*res://scripts/save_manager.gd"
+AudioManager="*res://scripts/audio_manager.gd"
 
 [display]
 

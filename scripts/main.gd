@@ -24,6 +24,10 @@ var game_over_trigger_count: int = 0
 var ability_cooldown: float = 0.0
 const ABILITY_COOLDOWN: float = 25.0
 const ABILITY_DAMAGE: float = 20.0
+var level_data: LevelData
+var total_waves: int = 10
+var victory_shown: bool = false
+var save_manager: Node
 
 var base: DefenseBase
 var archer: ShooterUnit
@@ -56,6 +60,11 @@ var boss_warning_tween: Tween:
 		return ui_controller.boss_warning_tween if is_instance_valid(ui_controller) else null
 
 func _ready() -> void:
+	save_manager = get_node("/root/SaveManager")
+	var catalog: Array[LevelData] = LevelData.create_catalog()
+	var selected_level: int = clampi(save_manager.last_level, 1, catalog.size())
+	level_data = catalog[selected_level - 1]
+	total_waves = level_data.total_waves
 	economy = EconomyScript.new()
 	add_child(economy)
 	economy.gold_changed.connect(_on_gold_changed)
@@ -100,6 +109,9 @@ func _create_controllers() -> void:
 	ui_controller.setup()
 	ui_controller.restart_requested.connect(_restart_game)
 	ui_controller.ability_requested.connect(_use_arrow_rain)
+	ui_controller.pause_requested.connect(_pause_game)
+	ui_controller.resume_requested.connect(_resume_game)
+	ui_controller.next_level_requested.connect(_next_level)
 
 	tower_build_manager = TowerBuildManagerScript.new()
 	add_child(tower_build_manager)
@@ -150,6 +162,9 @@ func _process(delta: float) -> void:
 				spawn_cooldown = spawn_interval
 		WaveManager.WaveState.ACTIVE:
 			if active_enemy_count == 0 and wave_manager.mark_completed():
+				if wave >= total_waves:
+					_finish_victory()
+					return
 				intermission = 3.0
 				ui_controller.set_message("Dalga temizlendi!")
 		WaveManager.WaveState.COMPLETED:
@@ -301,8 +316,41 @@ func _finish_game() -> void:
 	_stop_combat()
 	ui_controller.show_game_over(wave, economy.total_gold_earned)
 
+
+func _finish_victory() -> void:
+	if victory_shown or game_over:
+		return
+	victory_shown = true
+	_stop_combat()
+	var health_ratio: float = float(base.health) / float(maxi(1, base.max_health))
+	var stars: int = 3 if health_ratio >= 0.8 else 2 if health_ratio >= 0.5 else 1
+	save_manager.complete_level(level_data.id, stars)
+	ui_controller.show_victory(level_data.display_name, stars, base.health, economy.total_gold_earned)
+
+
+func _pause_game() -> void:
+	if game_over or victory_shown or get_tree().paused:
+		return
+	ui_controller.show_pause()
+	get_tree().paused = true
+
+
+func _resume_game() -> void:
+	get_tree().paused = false
+	ui_controller.hide_pause()
+
 func _restart_game() -> void:
 	_prepare_restart()
+	get_tree().reload_current_scene()
+
+
+func _next_level() -> void:
+	get_tree().paused = false
+	if level_data.id >= LevelData.create_catalog().size():
+		get_tree().change_scene_to_file("res://scenes/level_select.tscn")
+		return
+	save_manager.last_level = level_data.id + 1
+	save_manager.save_data()
 	get_tree().reload_current_scene()
 
 func _prepare_restart() -> void:
@@ -320,6 +368,8 @@ func _prepare_restart() -> void:
 	ui_controller.reset()
 	active_enemy_count = 0
 	game_over = false
+	victory_shown = false
+	get_tree().paused = false
 	wave = 0
 	ability_cooldown = 0.0
 	ui_controller.update_ability_cooldown(0.0)
