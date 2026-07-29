@@ -4,12 +4,13 @@ const EnemyScript = preload("res://scripts/enemy.gd")
 const ShooterScript = preload("res://scripts/shooter.gd")
 const BaseScript = preload("res://scripts/base.gd")
 const GamePathScript = preload("res://scripts/game_path.gd")
+const EconomyScript = preload("res://scripts/economy_manager.gd")
+const TowerSelectionPanelScript = preload("res://scripts/tower_selection_panel.gd")
 
 const WORLD_SIZE := Vector2(1080.0, 1920.0)
 const STARTING_GOLD := 20
-const BASE_TOWER_COST := 25
+const BUILD_SPOT_COSTS: Array[int] = [15, 20, 25, 30]
 
-var gold: int = STARTING_GOLD
 var wave: int = 0
 var spawn_remaining: int = 0
 var spawn_cooldown: float = 0.0
@@ -22,17 +23,16 @@ var base: DefenseBase
 var archer: ShooterUnit
 var enemy_path: Path2D
 var build_spots: Array[Vector2] = [
-	Vector2(185.0, 1390.0),
-	Vector2(860.0, 1400.0),
-	Vector2(215.0, 1110.0),
-	Vector2(865.0, 1025.0),
-	Vector2(185.0, 785.0),
-	Vector2(855.0, 690.0),
-	Vector2(265.0, 445.0),
-	Vector2(820.0, 350.0)
+	Vector2(205.0, 1370.0),
+	Vector2(875.0, 1240.0),
+	Vector2(205.0, 815.0),
+	Vector2(860.0, 620.0)
 ]
 var built_spots: Array[bool] = []
 var towers: Array[Node2D] = []
+var economy: EconomyManager
+var selected_build_spot: int = -1
+var tower_selection_panel: TowerSelectionPanel
 
 var gold_label: Label
 var wave_label: Label
@@ -44,6 +44,11 @@ var game_over_layer: CanvasLayer
 func _ready() -> void:
 	for _spot in build_spots:
 		built_spots.append(false)
+
+	economy = EconomyScript.new()
+	add_child(economy)
+	economy.gold_changed.connect(_on_gold_changed)
+	economy.setup(STARTING_GOLD)
 
 	_create_world()
 	_create_ui()
@@ -91,6 +96,7 @@ func _create_enemy_curve() -> Curve2D:
 
 func _create_ui() -> void:
 	var canvas := CanvasLayer.new()
+	canvas.name = "Interface"
 	canvas.layer = 10
 	add_child(canvas)
 
@@ -202,8 +208,7 @@ func _spawn_enemy() -> void:
 	enemy.reached_base.connect(_on_enemy_reached_base)
 
 func _on_enemy_defeated(reward: int) -> void:
-	gold += reward
-	_update_ui()
+	economy.add_gold(reward)
 
 func _on_enemy_reached_base(damage: int) -> void:
 	base.take_damage(damage)
@@ -212,7 +217,7 @@ func _on_enemy_reached_base(damage: int) -> void:
 		_finish_game()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if game_over:
+	if game_over or is_instance_valid(tower_selection_panel):
 		return
 
 	var pressed: bool = false
@@ -231,31 +236,63 @@ func _unhandled_input(event: InputEvent) -> void:
 	for index in build_spots.size():
 		if built_spots[index]:
 			continue
-		if input_position.distance_to(build_spots[index]) <= 48.0:
-			_try_build_tower(index)
+		if input_position.distance_to(build_spots[index]) <= 68.0:
+			_open_tower_selection(index)
 			break
 
-func _try_build_tower(index: int) -> void:
-	var cost: int = _current_tower_cost()
-	if gold < cost:
+func _open_tower_selection(index: int) -> void:
+	if index < 0 or index >= build_spots.size() or built_spots[index]:
+		return
+	selected_build_spot = index
+	tower_selection_panel = TowerSelectionPanelScript.new()
+	var canvas := get_node("Interface") as CanvasLayer
+	canvas.add_child(tower_selection_panel)
+	tower_selection_panel.setup(BUILD_SPOT_COSTS[index], economy)
+	tower_selection_panel.tower_selected.connect(_on_tower_selected)
+	tower_selection_panel.closed.connect(_on_tower_panel_closed)
+	message_label.text = "Kule türünü seç"
+
+func _on_tower_selected(tower_type: ShooterUnit.TowerType) -> void:
+	if not is_instance_valid(tower_selection_panel):
+		return
+	if selected_build_spot < 0 or selected_build_spot >= build_spots.size():
+		_close_tower_panel()
+		return
+
+	var cost: int = tower_selection_panel.get_tower_cost(tower_type)
+	if not economy.spend_gold(cost):
 		message_label.text = "Yetersiz altın: %d gerekli" % cost
 		return
 
-	gold -= cost
-	built_spots[index] = true
-
-	var tower: Node2D = ShooterScript.new()
+	var tower: ShooterUnit = ShooterScript.new()
 	add_child(tower)
-	tower.position = build_spots[index]
-	tower.setup_tower(1)
+	tower.position = build_spots[selected_build_spot]
+	tower.setup_tower(tower_type, 1)
 	towers.append(tower)
+	built_spots[selected_build_spot] = true
 
-	message_label.text = "Kule kuruldu!"
-	_update_ui()
+	var tower_name: String = (
+		"Arbalet Kulesi"
+		if tower_type == ShooterUnit.TowerType.CROSSBOW
+		else "Okçu Kulesi"
+	)
+	message_label.text = "%s kuruldu!" % tower_name
+	_close_tower_panel()
 	queue_redraw()
 
-func _current_tower_cost() -> int:
-	return BASE_TOWER_COST + towers.size() * 10
+func _on_tower_panel_closed() -> void:
+	tower_selection_panel = null
+	selected_build_spot = -1
+
+func _close_tower_panel() -> void:
+	if is_instance_valid(tower_selection_panel):
+		tower_selection_panel.queue_free()
+	tower_selection_panel = null
+	selected_build_spot = -1
+
+func _on_gold_changed(current_gold: int) -> void:
+	if is_instance_valid(gold_label):
+		gold_label.text = "Altın: %d" % current_gold
 
 func _finish_game() -> void:
 	game_over = true
@@ -299,10 +336,10 @@ func _restart_game() -> void:
 	get_tree().reload_current_scene()
 
 func _update_ui() -> void:
-	gold_label.text = "Altın: %d" % gold
+	gold_label.text = "Altın: %d" % economy.gold
 	wave_label.text = "Dalga: %d" % wave
 	base_label.text = "Kale: %d" % base.health
-	help_label.text = "Kule maliyeti: %d altın • boş daireye dokun" % _current_tower_cost()
+	help_label.text = "Kule kurmak için işaretli alanlardan birine dokun"
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), Color("2e9c69"))
@@ -315,9 +352,20 @@ func _draw() -> void:
 			continue
 		var spot := build_spots[index]
 		draw_circle(spot, 43.0, Color(0.1, 0.14, 0.18, 0.55))
-		draw_arc(spot, 43.0, 0.0, TAU, 48, Color("f5c451"), 4.0)
-		draw_line(spot + Vector2(-13.0, 0.0), spot + Vector2(13.0, 0.0), Color("f5c451"), 4.0)
-		draw_line(spot + Vector2(0.0, -13.0), spot + Vector2(0.0, 13.0), Color("f5c451"), 4.0)
+		for segment in range(12):
+			var start_angle: float = float(segment) * TAU / 12.0
+			var end_angle: float = start_angle + TAU / 24.0
+			draw_arc(spot, 58.0, start_angle, end_angle, 4, Color("fff1bd"), 6.0)
+		var cost_text: String = "● %d" % BUILD_SPOT_COSTS[index]
+		draw_string(
+			ThemeDB.fallback_font,
+			spot + Vector2(-34.0, 10.0),
+			cost_text,
+			HORIZONTAL_ALIGNMENT_CENTER,
+			68.0,
+			24,
+			Color("fff1bd")
+		)
 
 func _draw_environment() -> void:
 	var tree_positions: Array[Vector2] = [
