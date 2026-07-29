@@ -1,4 +1,5 @@
 extends Node2D
+class_name ShooterUnit
 
 const ArrowScript = preload("res://scripts/arrow.gd")
 
@@ -12,7 +13,7 @@ var level: int = 1
 
 func setup_archer() -> void:
 	is_archer = true
-	attack_range = 430.0
+	attack_range = 520.0
 	damage = 2.5
 	fire_interval = 0.70
 	queue_redraw()
@@ -22,7 +23,7 @@ func setup_tower(tower_level: int = 1) -> void:
 	level = tower_level
 	attack_range = 280.0 + tower_level * 18.0
 	damage = 1.8 + tower_level * 0.65
-	fire_interval = max(0.28, 0.92 - tower_level * 0.07)
+	fire_interval = maxf(0.28, 0.92 - float(tower_level) * 0.07)
 	queue_redraw()
 
 func _process(delta: float) -> void:
