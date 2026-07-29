@@ -28,6 +28,8 @@ var turret_head: Node2D
 var muzzle: Marker2D
 var last_projectile: Node2D
 var projectile_parent: Node2D
+var invested_gold: int = 0
+var build_spot_index: int = -1
 
 
 func _ready() -> void:
@@ -66,16 +68,42 @@ func setup_tower(
 		else TowerData.ARCHER_ID
 	)
 	tower_data = TowerData.create_for_id(tower_id)
-	attack_range = tower_data.attack_range + float(level - 1) * 16.0
-	damage = tower_data.damage + float(level - 1) * (4.0 if tower_data.is_heavy_projectile else 2.0)
-	fire_interval = maxf(
-		0.8 if tower_data.is_heavy_projectile else 0.35,
-		tower_data.fire_interval - float(level - 1) * (0.08 if tower_data.is_heavy_projectile else 0.05)
-	)
-	arrow_speed = tower_data.projectile_speed
+	apply_level_stats()
 	_ensure_visual_nodes()
 	muzzle.position = Vector2(0.0, -82.0 if tower_data.is_heavy_projectile else -74.0)
 	_queue_visual_redraw()
+
+
+func apply_level_stats() -> void:
+	if tower_data == null:
+		return
+	level = clampi(level, 1, tower_data.maximum_level)
+	damage = tower_data.get_damage(level)
+	attack_range = tower_data.get_attack_range(level)
+	fire_interval = tower_data.get_fire_interval(level)
+	arrow_speed = tower_data.projectile_speed
+	cooldown = minf(cooldown, fire_interval)
+	_queue_visual_redraw()
+
+
+func can_upgrade() -> bool:
+	return tower_data != null and level < tower_data.maximum_level
+
+
+func get_upgrade_cost() -> int:
+	return tower_data.get_upgrade_cost(level) if tower_data != null else 0
+
+
+func upgrade() -> bool:
+	if not can_upgrade():
+		return false
+	level += 1
+	apply_level_stats()
+	return true
+
+
+func get_sell_refund() -> int:
+	return tower_data.get_sell_refund(invested_gold) if tower_data != null else 0
 
 
 func _ensure_visual_nodes() -> void:
@@ -246,6 +274,10 @@ func _draw_static_visual(canvas: Node2D) -> void:
 		Vector2(-42.0, 28.0), Vector2(-42.0, -10.0)
 	]), Color("88958d"))
 	canvas.draw_circle(Vector2.ZERO, 28.0, Color("596b63"))
+	if level >= 2:
+		canvas.draw_arc(Vector2.ZERO, 34.0, 0.0, TAU, 28, tower_data.accent.lightened(0.18), 5.0)
+	if level >= 3:
+		canvas.draw_circle(Vector2(0.0, 35.0), 7.0, Color("f5c85b"))
 
 
 func _draw_rotating_visual(canvas: Node2D) -> void:
@@ -266,3 +298,7 @@ func _draw_rotating_visual(canvas: Node2D) -> void:
 			Vector2(-34.0, -40.0), Vector2(0.0, -72.0), Vector2(34.0, -40.0)
 		]), Color("73bd89"))
 		canvas.draw_arc(Vector2(12.0, -48.0), 22.0, -1.2, 1.2, 20, Color("6f4518"), 4.0)
+	if level >= 2:
+		canvas.draw_line(Vector2(-30.0, -20.0), Vector2(30.0, -20.0), tower_data.accent.lightened(0.28), 7.0)
+	if level >= 3:
+		canvas.draw_circle(Vector2(0.0, -62.0), 9.0, Color("ffd667"))

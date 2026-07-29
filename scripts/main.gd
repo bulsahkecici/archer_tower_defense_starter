@@ -39,6 +39,9 @@ var selected_build_spot: int:
 var tower_selection_panel: TowerSelectionPanel:
 	get:
 		return tower_build_manager.tower_selection_panel if is_instance_valid(tower_build_manager) else null
+var tower_upgrade_panel: TowerUpgradePanel:
+	get:
+		return tower_build_manager.tower_upgrade_panel if is_instance_valid(tower_build_manager) else null
 var game_over_layer: CanvasLayer:
 	get:
 		return ui_controller.game_over_layer if is_instance_valid(ui_controller) else null

@@ -90,9 +90,12 @@ func _test_mouse_build_flow(game: Node) -> void:
 	_dispatch_mouse_click(screen_position)
 	await process_frame
 	_expect(
-		not is_instance_valid(game.tower_selection_panel),
-		"Dolu BuildSpot gerçek input ile tekrar kullanılamamalı"
+		not is_instance_valid(game.tower_selection_panel)
+		and is_instance_valid(game.tower_upgrade_panel),
+		"Dolu BuildSpot kurma yerine yükseltme paneli açmalı"
 	)
+	game._close_tower_panel()
+	await process_frame
 
 
 func _test_touch_and_modal_flow(game: Node) -> void:

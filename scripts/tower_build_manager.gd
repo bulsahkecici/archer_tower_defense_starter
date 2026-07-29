@@ -6,6 +6,7 @@ signal message_requested(text: String)
 
 const ShooterScript = preload("res://scripts/shooter.gd")
 const PanelScript = preload("res://scripts/tower_selection_panel.gd")
+const UpgradePanelScript = preload("res://scripts/tower_upgrade_panel.gd")
 const BUILD_SPOT_COSTS: Array[int] = [15, 20, 25, 30]
 
 var build_spots: Array[Vector2] = [
@@ -16,12 +17,15 @@ var build_spots: Array[Vector2] = [
 ]
 var built_spots: Array[bool] = [false, false, false, false]
 var towers: Array[Node2D] = []
+var towers_by_spot: Array[Node2D] = [null, null, null, null]
 var economy: EconomyManager
 var interface_layer: CanvasLayer
 var world_parent: Node2D
 var projectile_parent: Node2D
 var selected_build_spot: int = -1
 var tower_selection_panel: TowerSelectionPanel
+var tower_upgrade_panel: TowerUpgradePanel
+var transaction_locked: bool = false
 var hovered_build_spot: int = -1
 var pressed_build_spot: int = -1
 var press_time: float = 0.0
@@ -54,7 +58,11 @@ func _process(delta: float) -> void:
 
 
 func handle_input(event: InputEvent) -> bool:
-	if not input_enabled or is_instance_valid(tower_selection_panel):
+	if (
+		not input_enabled
+		or is_instance_valid(tower_selection_panel)
+		or is_instance_valid(tower_upgrade_panel)
+	):
 		return false
 	if event is InputEventMouseMotion:
 		hovered_build_spot = find_build_spot_at(_screen_to_local(event.position))
@@ -70,13 +78,16 @@ func handle_input(event: InputEvent) -> bool:
 		input_position = event.position
 	if not pressed:
 		return false
-	var index: int = find_build_spot_at(_screen_to_local(input_position))
+	var index: int = find_any_build_spot_at(_screen_to_local(input_position))
 	if index < 0:
 		return false
 	pressed_build_spot = index
 	press_time = 0.14
 	queue_redraw()
-	open_tower_selection(index)
+	if built_spots[index]:
+		open_tower_upgrade(index)
+	else:
+		open_tower_selection(index)
 	return true
 
 
@@ -89,6 +100,13 @@ func _screen_to_local(screen_position: Vector2) -> Vector2:
 func find_build_spot_at(local_position: Vector2) -> int:
 	for index in build_spots.size():
 		if not built_spots[index] and local_position.distance_to(build_spots[index]) <= 68.0:
+			return index
+	return -1
+
+
+func find_any_build_spot_at(local_position: Vector2) -> int:
+	for index in build_spots.size():
+		if local_position.distance_to(build_spots[index]) <= 76.0:
 			return index
 	return -1
 
@@ -125,8 +143,11 @@ func select_tower(tower_type: ShooterUnit.TowerType) -> ShooterUnit:
 	tower.position = build_spots[selected_build_spot]
 	tower.z_index = clampi(int(tower.position.y), 0, 1900)
 	tower.setup_tower(tower_type, 1)
+	tower.invested_gold = cost
+	tower.build_spot_index = selected_build_spot
 	tower.play_build_animation()
 	towers.append(tower)
+	towers_by_spot[selected_build_spot] = tower
 	built_spots[selected_build_spot] = true
 	var built_position: Vector2 = build_spots[selected_build_spot]
 	close_panel()
@@ -139,15 +160,89 @@ func _on_tower_selected(tower_type: ShooterUnit.TowerType) -> void:
 	select_tower(tower_type)
 
 
+func open_tower_upgrade(index: int) -> bool:
+	if index < 0 or index >= build_spots.size() or not built_spots[index]:
+		return false
+	if is_instance_valid(tower_upgrade_panel) or is_instance_valid(tower_selection_panel):
+		return false
+	var tower: ShooterUnit = towers_by_spot[index] as ShooterUnit
+	if not is_instance_valid(tower):
+		return false
+	selected_build_spot = index
+	tower_upgrade_panel = UpgradePanelScript.new()
+	interface_layer.add_child(tower_upgrade_panel)
+	tower_upgrade_panel.setup(tower, economy)
+	tower_upgrade_panel.upgrade_requested.connect(_upgrade_selected_tower)
+	tower_upgrade_panel.sell_requested.connect(_sell_selected_tower)
+	tower_upgrade_panel.closed.connect(_on_upgrade_panel_closed)
+	return true
+
+
+func _upgrade_selected_tower() -> bool:
+	if transaction_locked or not is_instance_valid(tower_upgrade_panel):
+		return false
+	var tower: ShooterUnit = tower_upgrade_panel.tower
+	if not is_instance_valid(tower) or not tower.can_upgrade():
+		tower_upgrade_panel.refresh()
+		return false
+	var cost: int = tower.get_upgrade_cost()
+	if cost <= 0 or not economy.can_afford(cost):
+		tower_upgrade_panel.refresh()
+		return false
+	transaction_locked = true
+	var spent: bool = economy.spend_gold(cost)
+	if spent:
+		tower.invested_gold += cost
+		tower.upgrade()
+		message_requested.emit("%s seviye %d oldu!" % [tower.tower_data.display_name, tower.level])
+		tower_upgrade_panel.refresh()
+	transaction_locked = false
+	return spent
+
+
+func _sell_selected_tower() -> bool:
+	if transaction_locked or not is_instance_valid(tower_upgrade_panel):
+		return false
+	var tower: ShooterUnit = tower_upgrade_panel.tower
+	if not is_instance_valid(tower):
+		close_panel()
+		return false
+	var index: int = tower.build_spot_index
+	if index < 0 or index >= built_spots.size() or towers_by_spot[index] != tower:
+		return false
+	transaction_locked = true
+	var refund: int = tower.get_sell_refund()
+	tower.stop_combat()
+	towers.erase(tower)
+	towers_by_spot[index] = null
+	built_spots[index] = false
+	close_panel()
+	if refund > 0:
+		economy.add_gold(refund)
+	tower.queue_free()
+	transaction_locked = false
+	queue_redraw()
+	message_requested.emit("Kule satıldı: +%d altın" % refund)
+	return true
+
+
 func close_panel() -> void:
 	if is_instance_valid(tower_selection_panel):
 		tower_selection_panel.queue_free()
 	tower_selection_panel = null
+	if is_instance_valid(tower_upgrade_panel):
+		tower_upgrade_panel.queue_free()
+	tower_upgrade_panel = null
 	selected_build_spot = -1
 
 
 func _on_panel_closed() -> void:
 	tower_selection_panel = null
+	selected_build_spot = -1
+
+
+func _on_upgrade_panel_closed() -> void:
+	tower_upgrade_panel = null
 	selected_build_spot = -1
 
 
@@ -157,6 +252,7 @@ func reset() -> void:
 		if is_instance_valid(tower):
 			tower.queue_free()
 	towers.clear()
+	towers_by_spot = [null, null, null, null]
 	built_spots.fill(false)
 	hovered_build_spot = -1
 	pressed_build_spot = -1
