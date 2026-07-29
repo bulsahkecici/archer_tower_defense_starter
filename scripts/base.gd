@@ -5,11 +5,13 @@ var max_health: int = 100
 var health: int = 100
 
 func take_damage(amount: int) -> void:
-	health = maxi(0, health - amount)
+	if amount <= 0 or health <= 0:
+		return
+	health = clampi(health - amount, 0, max_health)
 	queue_redraw()
 
 func reset() -> void:
-	health = max_health
+	health = maxi(0, max_health)
 	queue_redraw()
 
 func _draw() -> void:

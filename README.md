@@ -6,13 +6,16 @@ Kingshot reklamlarındaki okçu + kule savunması fikrine benzeyen, ancak tamame
 
 - Okçu otomatik olarak en yakın düşmana ateş eder.
 - Öldürülen düşmanlar altın verir.
-- Sarı halkalara tıklayarak okçu kulesi kurulur.
-- Kule maliyeti her yeni kulede artar.
-- Dalgalar ilerledikçe düşman canı, hızı, büyüklüğü ve hasarı artar.
-- Her 5. dalgada boss çıkar.
+- Dört inşa noktasından Okçu veya Arbalet Kulesi seçilebilir.
+- Merkezi ekonomi yöneticisi güvenli altın kazanma ve harcama sağlar.
+- Normal, hızlı ve boss düşmanlar veri odaklı istatistikler kullanır.
+- İlk beş dalga açık kompozisyonlarla, sonraki dalgalar kontrollü formülle ilerler.
+- Her 5. dalgada tek boss çıkar.
 - Kale canı sıfıra düşünce oyun biter.
 - Mouse ve dokunmatik giriş desteklenir.
 - Harici görsel veya ses dosyası gerekmez.
+- Hasar, ölüm, kule kurma, geri tepme ve altın geri bildirimleri hafif Tween'ler kullanır.
+- HUD ve seçim paneli anchor/container tabanlı mobil güvenli kenar boşluklarına sahiptir.
 
 ## Çalıştırma
 
@@ -52,22 +55,32 @@ archer_tower_defense_starter/
 ├── README.md
 └── scripts/
     ├── main.gd
+    ├── enemy_data.gd
+    ├── wave_manager.gd
     ├── enemy.gd
     ├── shooter.gd
     ├── arrow.gd
-    └── base.gd
+    ├── base.gd
+    ├── economy_manager.gd
+    ├── visual_effect.gd
+    └── tower_selection_panel.gd
 ```
 
-## Geliştirme sırası
+## Otomatik testler
 
-1. Ses ve vurma efektleri
-2. Okçu/kule yükseltme sistemi
-3. Farklı düşman tipleri
-4. Kule seçim menüsü
-5. Seviye haritası ve bölüm sistemi
-6. Kalıcı para ve kayıt sistemi
-7. Mobil arayüz
-8. iOS export ve TestFlight
+```bash
+"/Applications/Godot.app/Contents/MacOS/Godot" \
+  --headless \
+  --audio-driver Dummy \
+  --display-driver headless \
+  --rendering-driver dummy \
+  --log-file "/private/tmp/archer_stage4_test.log" \
+  --path "/path/to/archer_tower_defense_starter" \
+  --script "res://tests/stage4_runtime_test.gd"
+```
+
+AŞAMA 5 görsel/runtime kontrolü için aynı komutta test yolunu
+`res://tests/stage5_runtime_test.gd` olarak değiştir.
 
 ## Not
 
