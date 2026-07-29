@@ -162,7 +162,10 @@ func _test_restart_cleanup(game: Node) -> void:
 	game._prepare_restart()
 	await process_frame
 	_expect(game.wave == 0, "Restart hazırlığında dalga sıfırlanmalı")
-	_expect(game.economy.gold == game.STARTING_GOLD, "Restart altını sıfırlamalı")
+	_expect(
+		game.economy.gold == game.level_data.starting_gold,
+		"Restart seçili bölümün başlangıç altınını yenilemeli"
+	)
 	_expect(game.base.health == game.base.max_health, "Restart kale canını yenilemeli")
 	_expect(game.towers.is_empty(), "Restart kule listesini temizlemeli")
 	_expect(game.built_spots.all(func(value: bool) -> bool: return not value), "BuildSpot'lar boşalmalı")

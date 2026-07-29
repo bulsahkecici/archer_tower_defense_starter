@@ -46,20 +46,22 @@ static func create_catalog() -> Array[LevelData]:
 		Vector2(205.0, 815.0), Vector2(860.0, 620.0)
 	]
 	return [
-		LevelData.new(1, "Yeşil Geçit", 20, 100, 10, 1.0, green_spots, [15, 20, 25, 30], &"green", 0),
-		LevelData.new(2, "Taş Vadi", 22, 100, 12, 1.08, [
+		# İlk bölüm iki temel kuleyle başlanabilecek, öğretici bir zorlukta.
+		LevelData.new(1, "Yeşil Geçit", 35, 125, 10, 0.72, green_spots, [15, 20, 25, 30], &"green", 0),
+		# İkinci bölüm hâlâ affedici; asıl standart zorluk üçüncü bölümde başlar.
+		LevelData.new(2, "Taş Vadi", 37, 115, 12, 0.86, [
 			Vector2(250.0, 1375.0), Vector2(885.0, 1210.0),
 			Vector2(220.0, 760.0), Vector2(820.0, 560.0)
 		], [16, 21, 26, 31], &"stone", 1),
-		LevelData.new(3, "Donmuş Yol", 24, 105, 14, 1.16, [
+		LevelData.new(3, "Donmuş Yol", 28, 110, 14, 1.0, [
 			Vector2(300.0, 1430.0), Vector2(900.0, 1300.0),
 			Vector2(190.0, 900.0), Vector2(845.0, 700.0)
 		], [17, 22, 27, 32], &"ice", 2),
-		LevelData.new(4, "Kızıl Orman", 25, 110, 16, 1.24, [
+		LevelData.new(4, "Kızıl Orman", 27, 110, 16, 1.15, [
 			Vector2(235.0, 1450.0), Vector2(900.0, 1130.0),
 			Vector2(210.0, 700.0), Vector2(875.0, 470.0)
 		], [18, 23, 28, 33], &"red", 3),
-		LevelData.new(5, "Son Kale", 28, 120, 20, 1.35, [
+		LevelData.new(5, "Son Kale", 30, 120, 20, 1.30, [
 			Vector2(285.0, 1390.0), Vector2(910.0, 1260.0),
 			Vector2(180.0, 840.0), Vector2(880.0, 600.0)
 		], [20, 25, 30, 35], &"gold", 4)

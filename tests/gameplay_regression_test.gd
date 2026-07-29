@@ -70,8 +70,8 @@ func _test_mouse_build_flow(game: Node) -> void:
 		return
 	_expect(
 		not game.tower_selection_panel.archer_button.disabled
-		and game.tower_selection_panel.crossbow_button.disabled,
-		"Başlangıç altında Okçu aktif, Arbalet pasif olmalı"
+		and not game.tower_selection_panel.crossbow_button.disabled,
+		"Kolay başlangıç altında Okçu ve Arbalet erişilebilir olmalı"
 	)
 
 	var gold_before: int = game.economy.gold

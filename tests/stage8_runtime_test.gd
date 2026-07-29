@@ -37,6 +37,23 @@ func _test_scenes_and_levels() -> void:
 		and catalog[0].build_spot_positions != catalog[1].build_spot_positions,
 		"Bölümler tema, rota ve BuildSpot düzeniyle ayrışmalı"
 	)
+	_expect(
+		catalog[0].starting_gold >= catalog[0].build_spot_costs[0] + catalog[0].build_spot_costs[1]
+		and catalog[0].base_health >= 120
+		and catalog[0].wave_difficulty_multiplier <= 0.75,
+		"İlk bölüm iki temel kule ve affedici düşman değerleriyle başlamalı"
+	)
+	_expect(
+		catalog[0].wave_difficulty_multiplier
+			< catalog[1].wave_difficulty_multiplier
+		and catalog[1].wave_difficulty_multiplier
+			< catalog[2].wave_difficulty_multiplier
+		and catalog[2].wave_difficulty_multiplier
+			< catalog[3].wave_difficulty_multiplier
+		and catalog[3].wave_difficulty_multiplier
+			< catalog[4].wave_difficulty_multiplier,
+		"Bölüm zorluğu kademeli artmalı"
+	)
 	var menu_scene: PackedScene = load("res://scenes/main_menu.tscn")
 	var select_scene: PackedScene = load("res://scenes/level_select.tscn")
 	var game_scene: PackedScene = load("res://scenes/game.tscn")

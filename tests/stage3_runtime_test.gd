@@ -19,10 +19,21 @@ func _run() -> void:
 		game.BUILD_SPOT_COSTS == [15, 20, 25, 30],
 		"İnşa noktası maliyetleri 15/20/25/30 olmalı"
 	)
-	_expect(game.economy.gold == 20, "Başlangıç altını 20 olmalı")
+	_expect(
+		game.economy.gold == game.level_data.starting_gold
+		and game.economy.gold == 35,
+		"Kolaylaştırılan ilk bölüm 35 başlangıç altını vermeli"
+	)
+	var level_starting_gold: int = game.economy.gold
 	_expect(not game.economy.spend_gold(-1), "Negatif harcama reddedilmeli")
 	_expect(not game.economy.spend_gold(999), "Yetersiz bakiye harcaması reddedilmeli")
-	_expect(game.economy.gold == 20, "Reddedilen harcamalar bakiyeyi değiştirmemeli")
+	_expect(
+		game.economy.gold == level_starting_gold,
+		"Reddedilen harcamalar bakiyeyi değiştirmemeli"
+	)
+	# Eski düşük-bakiye ekonomi senaryosunu yeni bölüm başlangıç bonusundan
+	# bağımsız doğrula.
+	game.economy.setup(20)
 
 	game._open_tower_selection(0)
 	await process_frame
