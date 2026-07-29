@@ -1,6 +1,5 @@
 # Archer Tower Defense Starter
 
-Kingshot reklamlarındaki okçu + kule savunması fikrine benzeyen, ancak tamamen özgün ve dış varlık kullanmayan bir Godot 4 prototipidir.
 
 ## Özellikler
 
