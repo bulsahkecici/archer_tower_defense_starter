@@ -1,0 +1,8 @@
+# Godot tarafından otomatik oluşturulan cache ve editör dosyaları
+.godot/
+
+# macOS dosyaları
+.DS_Store
+
+# Yalnızca tasarım referansı olan ticari oyun ekran görüntüleri
+references/
