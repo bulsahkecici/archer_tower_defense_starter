@@ -25,7 +25,7 @@ Geçici ölçek sözleşmesi:
 | Değişmeden yeniden kullanılan | `EconomyManager`, `WaveManager`, `LevelData`, `EnemyData`, `TowerData`, `UIController`, `SettingsMenu`, `SaveManager`, `AudioManager`, `SafeAreaHelper` |
 | Uyarlanarak yeniden kullanılan | `MainMenu` ve `MenuNavigation` yalnızca ayrı 3D prototip girişini açmak için genişletildi |
 | 3D karşılığıyla değiştirilen | 2D `Main`, `GamePath`, `PathEnemy`, `ShooterUnit`, `ArrowProjectile`, `DefenseBase`, `TowerBuildManager` dünya temsilleri |
-| Yalnızca legacy 2D | Bomba/Arbalet/Buz kulelerinin 2D temsilleri, 2D efekt ve kozmetik dünya görselleri, mevcut 2D sahneler |
+| Yalnızca legacy 2D | 2D kule temsilleri, 2D efekt ve kozmetik dünya görselleri, mevcut 2D sahneler |
 
 Mevcut autoload'lar korunmuştur: `SaveManager`, `AudioManager`,
 `AchievementManager`, `CosmeticManager`. Yeni global singleton eklenmemiştir.
@@ -41,7 +41,7 @@ Game3D
 ├── EnemyRoute (Path3D)
 │   └── Enemy3D...
 ├── TowerContainer
-│   └── ArcherTower3D...
+│   └── Archer/Crossbow/Ice/Bomb Tower3D...
 ├── ProjectileContainer
 │   └── ArrowProjectile3D...
 ├── EffectContainer
@@ -92,8 +92,9 @@ kaya ve alçak tepe placeholder'ları içerir.
   tarar ve en yüksek `progress_ratio` değerini seçer. Her frame global tarama
   yapılmaz.
 - Kule mimarisi: ortak menzil, seçim, zamanlayıcı, hedefleme, üst bölüm dönüşü
-  ve ateş akışı `Tower3D` tabanındadır. `ArcherTower3D` yalnızca model ve ok
-  üretimini sağlar.
+  ve ateş akışı `Tower3D` tabanındadır. Okçu, Arbalet, Buz ve Bomba kuleleri
+  mevcut `TowerData` değerlerini kullanır. Arbalet ağır bolt, Buz süreli
+  yavaşlatma, Bomba alan hasarı uygular.
 - Mermi: görünür, hafif homing ok; `FirePoint` dünya transformundan doğar,
   hedef ölürse son bilinen konuma gider, bir kez hasar verir ve üç saniye
   içinde temizlenir.
@@ -115,4 +116,4 @@ kaya ve alçak tepe placeholder'ları içerir.
 3. Placeholder modelleri wrapper/`ModelRoot` sözleşmesiyle gerçek `.glb`
    dosyalarıyla değiştir.
 4. Fiziksel cihaz ve masaüstü görsel playtest yap.
-5. Dikey kesit onayından sonra ek kule/düşman/haritalara geç.
+5. Dört kulelik 3D prototip onayından sonra ek düşman ve haritalara geç.

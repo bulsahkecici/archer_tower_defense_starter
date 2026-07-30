@@ -11,9 +11,17 @@ var enemy_data: EnemyData
 var max_health: float = 30.0
 var health: float = 30.0
 var movement_speed: float = 2.25
+var base_movement_speed: float = 2.25
 var reward_gold: int = 3
 var castle_damage: int = 5
 var armor_ratio: float = 0.0
+var slow_resistance: float = 0.0
+var active_slow_ratio: float = 0.0
+var slow_remaining: float = 0.0
+var slow_tint: float = 0.0:
+	set(value):
+		slow_tint = clampf(value, 0.0, 1.0)
+		_apply_hit_flash()
 var has_resolved: bool = false
 var model_root: Node3D
 var visual_materials: Array[StandardMaterial3D] = []
@@ -37,16 +45,27 @@ func setup(data: EnemyData) -> void:
 	enemy_data = data
 	max_health = maxf(1.0, data.max_health)
 	health = max_health
-	movement_speed = maxf(0.1, data.movement_speed * SPEED_TO_METERS)
+	base_movement_speed = maxf(0.1, data.movement_speed * SPEED_TO_METERS)
+	movement_speed = base_movement_speed
 	reward_gold = maxi(0, data.reward_gold)
 	castle_damage = maxi(0, data.base_damage)
 	armor_ratio = clampf(data.armor_ratio, 0.0, 0.9)
+	slow_resistance = clampf(data.slow_resistance, 0.0, 0.9)
+	active_slow_ratio = 0.0
+	slow_remaining = 0.0
+	slow_tint = 0.0
 	has_resolved = false
 
 
 func _process(delta: float) -> void:
 	if has_resolved:
 		return
+	if slow_remaining > 0.0:
+		slow_remaining = maxf(0.0, slow_remaining - delta)
+		if slow_remaining <= 0.0:
+			active_slow_ratio = 0.0
+			movement_speed = base_movement_speed
+			slow_tint = 0.0
 	progress += movement_speed * delta
 	if progress_ratio >= 0.999:
 		resolve_at_castle()
@@ -67,6 +86,17 @@ func take_damage(amount: float) -> float:
 
 func get_route_progress() -> float:
 	return progress_ratio
+
+
+func apply_slow(ratio: float, duration: float) -> bool:
+	if has_resolved or ratio <= 0.0 or duration <= 0.0:
+		return false
+	var effective_ratio: float = clampf(ratio * (1.0 - slow_resistance), 0.0, 0.85)
+	active_slow_ratio = maxf(active_slow_ratio, effective_ratio)
+	slow_remaining = maxf(slow_remaining, duration)
+	movement_speed = base_movement_speed * (1.0 - active_slow_ratio)
+	slow_tint = 1.0
+	return true
 
 
 func resolve_defeated() -> bool:
@@ -111,7 +141,11 @@ func _play_hit_flash() -> void:
 func _apply_hit_flash() -> void:
 	for index in visual_materials.size():
 		if is_instance_valid(visual_materials[index]):
-			visual_materials[index].albedo_color = original_colors[index].lerp(
+			var slowed_color: Color = original_colors[index].lerp(
+				Color("74d7ed"),
+				slow_tint * 0.46
+			)
+			visual_materials[index].albedo_color = slowed_color.lerp(
 				Color.WHITE,
 				hit_flash * 0.88
 			)

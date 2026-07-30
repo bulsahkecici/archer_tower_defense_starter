@@ -1,0 +1,2 @@
+extends ArcherTower3D
+class_name IceTower3D

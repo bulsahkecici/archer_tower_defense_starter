@@ -170,9 +170,10 @@ func _build_ui() -> void:
 	tower_palette = TowerPalette3D.new()
 	ui_controller.interface_layer.add_child(tower_palette)
 	tower_palette.setup(level_data.build_spot_costs[0])
-	tower_palette.archer_selected.connect(_toggle_archer_selection)
+	tower_palette.tower_selected.connect(_toggle_tower_selection)
 	tower_palette.cancel_requested.connect(placement.cancel)
 	placement.selection_changed.connect(_on_placement_selection_changed)
+	_update_palette_availability()
 
 
 func start_vertical_slice_wave() -> bool:
@@ -232,7 +233,8 @@ func _on_enemy_reached_castle(damage: int, enemy: Enemy3D) -> void:
 func _on_tower_placed(tower: ArcherTower3D, _pad: BuildPad3D, _cost: int) -> void:
 	towers.append(tower)
 	towers_built += 1
-	ui_controller.set_message("OKÇU KULESİ HAZIR")
+	ui_controller.set_message("%s HAZIR" % tower.tower_data.display_name.to_upper())
+	_update_palette_availability()
 	_refresh_hud(false)
 
 
@@ -240,22 +242,35 @@ func _on_placement_rejected(reason: String) -> void:
 	ui_controller.set_message(reason)
 
 
-func _toggle_archer_selection() -> void:
-	if placement.selected_data == null:
-		placement.select_archer()
-	else:
+func _toggle_tower_selection(tower_id: StringName) -> void:
+	if placement.selected_data != null and placement.selected_data.id == tower_id:
 		placement.cancel()
+	else:
+		placement.select_tower(TowerData.create_for_id(tower_id))
 
 
-func _on_placement_selection_changed(active: bool) -> void:
-	tower_palette.set_selection_active(active)
+func _on_placement_selection_changed(active: bool, tower_id: StringName) -> void:
+	tower_palette.set_selection_active(active, tower_id)
 	if active:
-		ui_controller.set_message("OKÇU SEÇİLDİ • ALTIN RENKLİ BİR PLATFORMA DOKUN")
+		var data: TowerData = TowerData.create_for_id(tower_id)
+		ui_controller.set_message(
+			"%s SEÇİLDİ • BİR PLATFORMA DOKUN" % data.display_name.to_upper()
+		)
 
 
 func _on_gold_changed(_current_gold: int) -> void:
 	if is_instance_valid(ui_controller):
+		_update_palette_availability()
 		_refresh_hud()
+
+
+func _update_palette_availability() -> void:
+	if not is_instance_valid(tower_palette):
+		return
+	tower_palette.update_availability(
+		economy.gold,
+		placement.get_minimum_available_pad_cost()
+	)
 
 
 func _on_castle_health_changed(_current_health: int) -> void:

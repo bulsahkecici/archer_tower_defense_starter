@@ -3,7 +3,7 @@ class_name TowerPlacement3D
 
 signal tower_placed(tower: ArcherTower3D, pad: BuildPad3D, cost: int)
 signal placement_rejected(reason: String)
-signal selection_changed(active: bool)
+signal selection_changed(active: bool, tower_id: StringName)
 
 var camera: Camera3D
 var build_pads: Array[BuildPad3D] = []
@@ -33,11 +33,21 @@ func setup(
 
 
 func select_archer() -> void:
-	selected_data = TowerData.create_archer()
+	select_tower(TowerData.create_archer())
+
+
+func select_tower(data: TowerData) -> void:
+	selected_data = data
 	ghost_root.visible = false
+	ghost_material.albedo_color = Color(
+		data.accent.r,
+		data.accent.g,
+		data.accent.b,
+		0.58
+	)
 	for pad in build_pads:
 		pad.set_preview(is_pad_valid(pad))
-	selection_changed.emit(true)
+	selection_changed.emit(true, selected_data.id)
 
 
 func cancel() -> void:
@@ -48,7 +58,7 @@ func cancel() -> void:
 		ghost_root.visible = false
 	for pad in build_pads:
 		pad.set_preview(false, false)
-	selection_changed.emit(false)
+	selection_changed.emit(false, &"")
 
 
 func update_ghost_from_screen(screen_position: Vector2) -> bool:
@@ -141,14 +151,35 @@ func place_on_pad(pad: BuildPad3D) -> ArcherTower3D:
 	if not economy.spend_gold(cost):
 		placement_rejected.emit("Yetersiz altın")
 		return null
-	var tower := ArcherTower3D.new()
+	var tower: ArcherTower3D = _create_selected_tower()
+	tower.setup(selected_data, projectile_container)
 	tower_container.add_child(tower)
 	tower.global_position = pad.global_position
-	tower.setup(selected_data, projectile_container)
 	pad.set_occupied(tower)
 	tower_placed.emit(tower, pad, cost)
 	cancel()
 	return tower
+
+
+func get_minimum_available_pad_cost() -> int:
+	var minimum_cost: int = -1
+	for pad in build_pads:
+		if pad.occupied:
+			continue
+		if minimum_cost < 0 or pad.build_cost < minimum_cost:
+			minimum_cost = pad.build_cost
+	return minimum_cost
+
+
+func _create_selected_tower() -> ArcherTower3D:
+	match selected_data.id:
+		TowerData.CROSSBOW_ID:
+			return CrossbowTower3D.new()
+		TowerData.ICE_ID:
+			return IceTower3D.new()
+		TowerData.BOMB_ID:
+			return BombTower3D.new()
+	return ArcherTower3D.new()
 
 
 func _build_ghost() -> void:
