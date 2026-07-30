@@ -36,6 +36,15 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
 
+[layer_names]
+
+3d_physics/layer_1="Road"
+3d_physics/layer_2="Buildable"
+3d_physics/layer_3="Environment"
+3d_physics/layer_4="Castle"
+3d_physics/layer_5="Enemy"
+3d_physics/layer_6="Tower"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

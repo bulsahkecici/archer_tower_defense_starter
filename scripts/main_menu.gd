@@ -2,6 +2,7 @@ extends Control
 class_name MainMenu
 
 var start_button: Button
+var vertical_slice_button: Button
 var level_select_button: Button
 var settings_button: Button
 var about_button: Button
@@ -54,6 +55,7 @@ func _build_ui() -> void:
 	buttons.add_theme_constant_override("separation", 14)
 	scroll.add_child(buttons)
 	start_button = _button(buttons, "Oyuna Başla")
+	vertical_slice_button = _button(buttons, "3D Dikey Kesit  •  PROTOTİP")
 	endless_button = _button(buttons, "Sonsuz Mod")
 	level_select_button = _button(buttons, "Bölüm Seç")
 	achievements_button = _button(buttons, "Başarımlar")
@@ -62,6 +64,10 @@ func _build_ui() -> void:
 	settings_button = _button(buttons, "Ayarlar")
 	about_button = _button(buttons, "Hakkında")
 	start_button.pressed.connect(func() -> void: _start_level(save_manager.last_level))
+	vertical_slice_button.pressed.connect(
+		func() -> void:
+			MenuNavigation.change_scene(get_tree(), MenuNavigation.GAME_3D)
+	)
 	endless_button.disabled = not save_manager.is_endless_unlocked()
 	endless_button.text = (
 		"Sonsuz Mod  •  Rekor %d" % save_manager.endless_high_wave

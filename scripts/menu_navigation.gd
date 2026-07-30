@@ -8,6 +8,7 @@ const ABOUT := "res://scenes/about.tscn"
 const COSMETICS := "res://scenes/cosmetics.tscn"
 const TOWER_GUIDE := "res://scenes/tower_guide.tscn"
 const GAME := "res://main.tscn"
+const GAME_3D := "res://scenes/3d/game/game_3d.tscn"
 
 static var return_targets: Dictionary = {}
 
