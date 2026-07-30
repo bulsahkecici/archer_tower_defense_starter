@@ -1,16 +1,25 @@
 extends Control
 class_name SettingsMenu
 
+signal close_requested
+
 var music_slider: HSlider
 var sfx_slider: HSlider
 var vibration_toggle: CheckButton
 var screen_shake_toggle: CheckButton
 var save_manager: Node
 var audio_manager: Node
+var back_button: Button
+var embedded_mode: bool = false
+var _ui_built: bool = false
 
 
 func _ready() -> void:
-	Engine.time_scale = 1.0
+	if not embedded_mode:
+		Engine.time_scale = 1.0
+		get_tree().paused = false
+	else:
+		process_mode = Node.PROCESS_MODE_ALWAYS
 	save_manager = get_node("/root/SaveManager")
 	audio_manager = get_node("/root/AudioManager")
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -19,6 +28,9 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
+	if _ui_built:
+		return
+	_ui_built = true
 	var background := ColorRect.new()
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background.color = Color("173f38")
@@ -47,15 +59,16 @@ func _build_ui() -> void:
 	screen_shake_toggle.custom_minimum_size = Vector2(620.0, 90.0)
 	screen_shake_toggle.add_theme_font_size_override("font_size", 30)
 	content.add_child(screen_shake_toggle)
-	var back := Button.new()
-	back.text = "Geri"
-	back.custom_minimum_size = Vector2(620.0, 100.0)
-	content.add_child(back)
+	back_button = Button.new()
+	back_button.name = "BackButton"
+	back_button.text = "Geri"
+	back_button.custom_minimum_size = Vector2(620.0, 100.0)
+	content.add_child(back_button)
 	music_slider.value_changed.connect(_on_music_changed)
 	sfx_slider.value_changed.connect(_on_sfx_changed)
 	vibration_toggle.toggled.connect(_on_vibration_toggled)
 	screen_shake_toggle.toggled.connect(_on_screen_shake_toggled)
-	back.pressed.connect(_go_back)
+	back_button.pressed.connect(_go_back)
 
 
 func _add_slider(parent: Control, label_text: String) -> HSlider:
@@ -104,5 +117,7 @@ func _on_screen_shake_toggled(enabled: bool) -> void:
 
 
 func _go_back() -> void:
-	get_tree().paused = false
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	if embedded_mode:
+		close_requested.emit()
+		return
+	MenuNavigation.return_from(get_tree(), &"settings")

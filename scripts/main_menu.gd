@@ -9,6 +9,7 @@ var endless_button: Button
 var achievements_button: Button
 var cosmetics_button: Button
 var save_manager: Node
+var _ui_built: bool = false
 
 
 func _ready() -> void:
@@ -20,30 +21,44 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
+	if _ui_built:
+		return
+	_ui_built = true
 	var background := ColorRect.new()
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background.color = Color("173f38")
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 34)
+	margin.add_theme_constant_override("margin_right", 34)
+	margin.add_theme_constant_override("margin_top", 54)
+	margin.add_theme_constant_override("margin_bottom", 54)
+	add_child(margin)
 	var content := VBoxContainer.new()
-	content.custom_minimum_size = Vector2(700.0, 0.0)
-	content.add_theme_constant_override("separation", 28)
-	center.add_child(content)
+	content.add_theme_constant_override("separation", 20)
+	margin.add_child(content)
 	var title := Label.new()
-	title.text = "ARCHER TOWER DEFENSE"
+	title.text = GameMetadata.GAME_NAME.to_upper()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 58)
+	title.add_theme_font_size_override("font_size", 52)
 	content.add_child(title)
-	start_button = _button(content, "Oyuna Başla")
-	endless_button = _button(content, "Sonsuz Mod")
-	level_select_button = _button(content, "Bölüm Seç")
-	achievements_button = _button(content, "Başarımlar")
-	cosmetics_button = _button(content, "Kozmetikler")
-	settings_button = _button(content, "Ayarlar")
-	about_button = _button(content, "Hakkında")
+	var scroll := ScrollContainer.new()
+	scroll.name = "MenuScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(scroll)
+	var buttons := VBoxContainer.new()
+	buttons.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	buttons.add_theme_constant_override("separation", 14)
+	scroll.add_child(buttons)
+	start_button = _button(buttons, "Oyuna Başla")
+	endless_button = _button(buttons, "Sonsuz Mod")
+	level_select_button = _button(buttons, "Bölüm Seç")
+	achievements_button = _button(buttons, "Başarımlar")
+	cosmetics_button = _button(buttons, "Kozmetikler")
+	settings_button = _button(buttons, "Ayarlar")
+	about_button = _button(buttons, "Hakkında")
 	start_button.pressed.connect(func() -> void: _start_level(save_manager.last_level))
 	endless_button.disabled = not save_manager.is_endless_unlocked()
 	endless_button.text = (
@@ -55,20 +70,27 @@ func _build_ui() -> void:
 	settings_button.pressed.connect(_show_settings)
 	achievements_button.pressed.connect(
 		func() -> void:
-			get_tree().change_scene_to_file("res://scenes/achievements.tscn")
+			MenuNavigation.change_scene(get_tree(), "res://scenes/achievements.tscn")
 	)
 	cosmetics_button.pressed.connect(
 		func() -> void:
-			get_tree().change_scene_to_file("res://scenes/cosmetics.tscn")
+			MenuNavigation.open_with_return(
+				get_tree(), MenuNavigation.COSMETICS, &"cosmetics"
+			)
 	)
-	about_button.pressed.connect(func() -> void: title.text = "Özgün Godot kule savunması")
+	about_button.pressed.connect(
+		func() -> void:
+			MenuNavigation.open_with_return(get_tree(), MenuNavigation.ABOUT, &"about")
+	)
 
 
 func _button(parent: Control, text: String) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(620.0, 105.0)
-	button.add_theme_font_size_override("font_size", 32)
+	button.custom_minimum_size = Vector2(0.0, 92.0)
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_filter = Control.MOUSE_FILTER_STOP
+	button.add_theme_font_size_override("font_size", 30)
 	parent.add_child(button)
 	return button
 
@@ -79,7 +101,7 @@ func _start_level(level_id: int) -> bool:
 	save_manager.last_level = level_id
 	save_manager.selected_game_mode = &"story"
 	save_manager.save_data()
-	get_tree().change_scene_to_file("res://main.tscn")
+	MenuNavigation.change_scene(get_tree(), MenuNavigation.GAME)
 	return true
 
 
@@ -87,13 +109,15 @@ func _start_endless() -> bool:
 	if not save_manager.is_endless_unlocked():
 		return false
 	save_manager.selected_game_mode = &"endless"
-	get_tree().change_scene_to_file("res://main.tscn")
+	MenuNavigation.change_scene(get_tree(), MenuNavigation.GAME)
 	return true
 
 
 func _open_level_select() -> void:
-	get_tree().change_scene_to_file("res://scenes/level_select.tscn")
+	MenuNavigation.open_with_return(
+		get_tree(), MenuNavigation.LEVEL_SELECT, &"level_select"
+	)
 
 
 func _show_settings() -> void:
-	get_tree().change_scene_to_file("res://scenes/settings.tscn")
+	MenuNavigation.open_with_return(get_tree(), MenuNavigation.SETTINGS, &"settings")

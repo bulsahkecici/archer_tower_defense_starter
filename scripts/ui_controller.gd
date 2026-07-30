@@ -15,6 +15,7 @@ const WavePreviewPanelScript = preload("res://scripts/wave_preview_panel.gd")
 const TutorialOverlayScript = preload("res://scripts/tutorial_overlay.gd")
 const RewardChoicePanelScript = preload("res://scripts/reward_choice_panel.gd")
 const PerformancePanelScript = preload("res://scripts/performance_panel.gd")
+const SettingsMenuScript = preload("res://scripts/settings.gd")
 
 var interface_layer: CanvasLayer
 var gold_label: Label
@@ -31,6 +32,8 @@ var boss_warning_tween: Tween
 var ability_button: Button
 var pause_button: Button
 var pause_layer: CanvasLayer
+var pause_settings_layer: CanvasLayer
+var pause_settings_menu: SettingsMenu
 var victory_layer: CanvasLayer
 var speed_button: Button
 var selected_speed: float = 1.0
@@ -554,7 +557,7 @@ func show_pause() -> CanvasLayer:
 	pause_layer = _create_action_layer("OYUN DURAKLATILDI", [
 		["Devam Et", func() -> void: resume_requested.emit()],
 		["Yeniden Başlat", func() -> void: restart_requested.emit()],
-		["Ayarlar", func() -> void: _change_scene_unpaused("res://scenes/settings.tscn")],
+		["Ayarlar", show_pause_settings],
 		["Bölüm Seçimi", func() -> void: _change_scene_unpaused("res://scenes/level_select.tscn")],
 		["Ana Menü", func() -> void: _change_scene_unpaused("res://scenes/main_menu.tscn")]
 	])
@@ -563,9 +566,33 @@ func show_pause() -> CanvasLayer:
 
 
 func hide_pause() -> void:
+	hide_pause_settings()
 	if is_instance_valid(pause_layer):
 		pause_layer.queue_free()
 	pause_layer = null
+
+
+func show_pause_settings() -> SettingsMenu:
+	if is_instance_valid(pause_settings_menu):
+		return pause_settings_menu
+	pause_settings_layer = CanvasLayer.new()
+	pause_settings_layer.name = "PauseSettingsLayer"
+	pause_settings_layer.layer = 40
+	pause_settings_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(pause_settings_layer)
+	pause_settings_menu = SettingsMenuScript.new()
+	pause_settings_menu.name = "PauseSettings"
+	pause_settings_menu.embedded_mode = true
+	pause_settings_layer.add_child(pause_settings_menu)
+	pause_settings_menu.close_requested.connect(hide_pause_settings)
+	return pause_settings_menu
+
+
+func hide_pause_settings() -> void:
+	if is_instance_valid(pause_settings_layer):
+		pause_settings_layer.queue_free()
+	pause_settings_layer = null
+	pause_settings_menu = null
 
 
 func show_victory(

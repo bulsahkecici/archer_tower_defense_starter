@@ -4,6 +4,8 @@ class_name CosmeticsMenu
 var cosmetic_manager: Node
 var selection_buttons: Dictionary[StringName, Button] = {}
 var preview_colors: Dictionary[StringName, Color] = {}
+var back_button: Button
+var _ui_built: bool = false
 
 
 func _ready() -> void:
@@ -15,6 +17,9 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
+	if _ui_built:
+		return
+	_ui_built = true
 	var background := ColorRect.new()
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background.color = Color("173f38")
@@ -74,11 +79,12 @@ func _build_ui() -> void:
 		)
 		row.add_child(button)
 		selection_buttons[cosmetic_id] = button
-	var back := Button.new()
-	back.text = "Geri"
-	back.custom_minimum_size = Vector2(0.0, 88.0)
-	back.pressed.connect(
+	back_button = Button.new()
+	back_button.name = "BackButton"
+	back_button.text = "Geri"
+	back_button.custom_minimum_size = Vector2(0.0, 88.0)
+	back_button.pressed.connect(
 		func() -> void:
-			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+			MenuNavigation.return_from(get_tree(), &"cosmetics")
 	)
-	content.add_child(back)
+	content.add_child(back_button)
