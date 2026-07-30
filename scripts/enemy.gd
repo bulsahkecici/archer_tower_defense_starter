@@ -7,6 +7,7 @@ signal reached_base(damage: int)
 var max_health: float = 10.0
 var health: float = 10.0
 var speed: float = 60.0
+var base_speed: float = 60.0
 var reward: int = 3
 var base_damage: int = 5
 var body_radius: float = 20.0
@@ -17,6 +18,10 @@ var display_name: String = ""
 var visual_type: StringName = &"normal"
 var damage_tween: Tween
 var death_tween: Tween
+var armor_ratio: float = 0.0
+var slow_resistance: float = 0.0
+var slow_ratio: float = 0.0
+var slow_remaining: float = 0.0
 
 func setup(
 	enemy_data: EnemyData,
@@ -29,11 +34,16 @@ func setup(
 	visual_type = enemy_data.visual_type
 	max_health = enemy_data.max_health * maxf(0.01, health_multiplier)
 	health = max_health
-	speed = enemy_data.movement_speed * maxf(0.01, speed_multiplier)
+	base_speed = enemy_data.movement_speed * maxf(0.01, speed_multiplier)
+	speed = base_speed
 	reward = maxi(0, enemy_data.reward_gold + reward_bonus)
 	base_damage = maxi(0, enemy_data.base_damage)
 	body_radius = maxf(4.0, enemy_data.body_radius)
 	is_boss = enemy_data.is_boss
+	armor_ratio = enemy_data.armor_ratio
+	slow_resistance = enemy_data.slow_resistance
+	slow_ratio = 0.0
+	slow_remaining = 0.0
 	has_resolved = false
 	rotates = false
 	loop = false
@@ -45,6 +55,11 @@ func _process(delta: float) -> void:
 	if has_resolved:
 		return
 
+	if slow_remaining > 0.0:
+		slow_remaining -= delta
+		if slow_remaining <= 0.0:
+			slow_ratio = 0.0
+	speed = base_speed * (1.0 - slow_ratio)
 	var previous_position: Vector2 = global_position
 	progress += speed * delta
 	var movement: Vector2 = global_position - previous_position
@@ -58,12 +73,21 @@ func _process(delta: float) -> void:
 func take_damage(amount: float) -> void:
 	if has_resolved:
 		return
-	health -= amount
+	health -= maxf(0.0, amount) * (1.0 - armor_ratio)
 	if health <= 0.0:
 		resolve_defeated()
 	else:
 		_play_damage_feedback()
 		queue_redraw()
+
+
+func apply_slow(requested_ratio: float, duration: float) -> void:
+	if has_resolved or duration <= 0.0:
+		return
+	var effective_ratio: float = clampf(requested_ratio * (1.0 - slow_resistance), 0.0, 0.8)
+	slow_ratio = maxf(slow_ratio, effective_ratio)
+	slow_remaining = maxf(slow_remaining, duration)
+	speed = base_speed * (1.0 - slow_ratio)
 
 func resolve_defeated() -> bool:
 	if has_resolved:
@@ -71,6 +95,7 @@ func resolve_defeated() -> bool:
 	has_resolved = true
 	remove_from_group("enemies")
 	set_process(false)
+	slow_remaining = 0.0
 	if damage_tween != null and damage_tween.is_valid():
 		damage_tween.kill()
 	modulate = Color.WHITE
@@ -89,6 +114,7 @@ func resolve_at_base() -> bool:
 	if has_resolved:
 		return false
 	has_resolved = true
+	slow_remaining = 0.0
 	remove_from_group("enemies")
 	reached_base.emit(base_damage)
 	queue_free()
@@ -113,6 +139,12 @@ func _draw() -> void:
 	elif visual_type == &"boss":
 		body_color = Color("7350a1")
 		outline_color = Color("34234f")
+	elif visual_type == &"armored":
+		body_color = Color("6f7f8d")
+		outline_color = Color("34434e")
+	elif visual_type == &"swarm":
+		body_color = Color("d8c44d")
+		outline_color = Color("74651d")
 
 	draw_circle(Vector2(4.0, 7.0), body_radius, Color(0.05, 0.08, 0.09, 0.25))
 	if visual_type == &"fast":
