@@ -145,7 +145,23 @@ func _test_targeting_and_ability(game: Node) -> void:
 	var low_before: float = low.health
 	var high_before: float = high.health
 	_expect(game._use_arrow_rain(), "Ok Yağmuru kullanılabilmeli")
-	_expect(low.health < low_before and high.health < high_before, "Ok Yağmuru görünür düşmanlara hasar vermeli")
+	_expect(
+		is_equal_approx(low.health, low_before)
+		and is_equal_approx(high.health, high_before),
+		"Ok Yağmuru hasarı görsel varıştan önce uygulanmamalı"
+	)
+	for _step in range(60):
+		var ability_arrows: Array[Node] = get_nodes_in_group("ability_arrows")
+		if ability_arrows.is_empty():
+			break
+		for node in ability_arrows:
+			if is_instance_valid(node) and not node.is_queued_for_deletion():
+				(node as ArrowRainProjectile)._process(0.05)
+		await process_frame
+	_expect(
+		low.health < low_before and high.health < high_before,
+		"Ok Yağmuru görsel varışta görünür düşmanlara hasar vermeli"
+	)
 	_expect(not game._use_arrow_rain(), "Ok Yağmuru cooldown sırasında iki kez tetiklenmemeli")
 	game.ability_cooldown = 0.0
 	game.game_over = true

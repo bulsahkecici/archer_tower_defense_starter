@@ -11,6 +11,7 @@ const UIControllerScript = preload("res://scripts/ui_controller.gd")
 const TowerBuildManagerScript = preload("res://scripts/tower_build_manager.gd")
 const BossBehaviorScript = preload("res://scripts/boss_behavior.gd")
 const RunModifierManagerScript = preload("res://scripts/run_modifier_manager.gd")
+const ArrowRainProjectileScript = preload("res://scripts/arrow_rain_projectile.gd")
 
 const WORLD_SIZE := Vector2(1080.0, 1920.0)
 const STARTING_GOLD := 20
@@ -48,6 +49,7 @@ var towers_sold_count: int = 0
 var arrow_rain_uses: int = 0
 var tower_type_build_counts: Dictionary[StringName, int] = {}
 var run_unlocked_achievements: Array[String] = []
+var ability_arrow_spawn_count: int = 0
 
 var base: DefenseBase
 var archer: ShooterUnit
@@ -501,6 +503,7 @@ func _on_reward_selected(reward_id: StringName) -> void:
 	ui_controller.hide_reward_choices()
 	tower_build_manager.input_enabled = true
 	tower_build_manager.synergy_manager.recompute(towers)
+	ui_controller.set_ability_cooldown_duration(_get_ability_cooldown_duration())
 	intermission = minf(intermission, 0.15)
 	_update_ui()
 
@@ -539,14 +542,24 @@ func _use_arrow_rain() -> bool:
 			break
 		if not is_instance_valid(node) or node.is_queued_for_deletion() or node.get("has_resolved") == true:
 			continue
-		var multiplier: float = 0.5 if node.get("is_boss") == true else 1.0
-		node.take_damage(ABILITY_DAMAGE * multiplier)
+		var target := node as Node2D
+		var multiplier: float = 0.5 if target.get("is_boss") == true else 1.0
+		var arrow := ArrowRainProjectileScript.new()
+		projectiles.add_child(arrow)
+		var fallback: Vector2 = target.global_position
+		var start := Vector2(
+			fallback.x + randf_range(-76.0, 76.0),
+			-70.0 - float(hit_count % 4) * 24.0
+		)
+		arrow.setup(target, ABILITY_DAMAGE * multiplier, start, fallback)
+		ability_arrow_spawn_count += 1
 		hit_count += 1
 	if hit_count == 0:
 		return false
 	arrow_rain_uses += 1
 	achievement_manager.record_event(&"arrow_rain_hit", hit_count)
 	ability_cooldown = _get_ability_cooldown_duration()
+	ui_controller.set_ability_cooldown_duration(ability_cooldown)
 	ui_controller.update_ability_cooldown(ability_cooldown)
 	ui_controller.set_message("Ok Yağmuru!")
 	if tutorial_active and tutorial_step == 3:

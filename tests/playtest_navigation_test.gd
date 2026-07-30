@@ -158,6 +158,17 @@ func _test_pause_state_preservation() -> void:
 		and _game_state(game) == before,
 		"Devam Et sahneyi yüklemeden aynı oyun durumunu sürdürmeli"
 	)
+	game._pause_game()
+	await process_frame
+	var main_menu_button := _find_button(game.ui_controller.pause_layer, "Ana Menü")
+	main_menu_button.pressed.emit()
+	await _wait_frames()
+	_expect(
+		current_scene is MainMenu
+		and not paused
+		and is_equal_approx(Engine.time_scale, 1.0),
+		"Pause Ana Menü açık kullanıcı eylemiyle ana menüye dönmeli"
+	)
 
 
 func _game_state(game: Node) -> Dictionary:

@@ -35,6 +35,10 @@ var natural_slow_ratio: float = 0.0
 var natural_slow_active: bool = false
 var level_mechanic_id: int = 1
 var boss_behavior_description: String = ""
+var hit_flash_strength: float = 0.0:
+	set(value):
+		hit_flash_strength = clampf(value, 0.0, 1.0)
+		queue_redraw()
 
 func setup(
 	enemy_data: EnemyData,
@@ -161,6 +165,8 @@ func resolve_defeated() -> bool:
 	slow_remaining = 0.0
 	if damage_tween != null and damage_tween.is_valid():
 		damage_tween.kill()
+	damage_tween = null
+	hit_flash_strength = 0.0
 	modulate = Color.WHITE
 	defeated.emit(reward, global_position)
 	var death_duration: float = 0.28 if is_boss else 0.20
@@ -178,20 +184,26 @@ func resolve_at_base() -> bool:
 		return false
 	has_resolved = true
 	slow_remaining = 0.0
+	if damage_tween != null and damage_tween.is_valid():
+		damage_tween.kill()
+	damage_tween = null
+	hit_flash_strength = 0.0
 	remove_from_group("enemies")
 	reached_base.emit(base_damage)
 	queue_free()
 	return true
 
 func _play_damage_feedback() -> void:
+	if has_resolved:
+		return
 	if damage_tween != null and damage_tween.is_valid():
 		damage_tween.kill()
-	modulate = Color(1.0, 0.62, 0.58) if is_boss else Color(1.0, 0.78, 0.72)
+	hit_flash_strength = 1.0
 	scale = Vector2(1.08, 0.94)
 	damage_tween = create_tween()
 	damage_tween.set_parallel(true)
-	damage_tween.tween_property(self, "modulate", Color.WHITE, 0.12)
-	damage_tween.tween_property(self, "scale", Vector2.ONE, 0.12)
+	damage_tween.tween_property(self, "hit_flash_strength", 0.0, 0.13)
+	damage_tween.tween_property(self, "scale", Vector2.ONE, 0.13)
 
 func _draw() -> void:
 	var body_color: Color = Color("b95448")
@@ -238,13 +250,22 @@ func _draw() -> void:
 	draw_circle(Vector2(-body_radius * 0.32, -body_radius * 0.10), maxf(1.5, body_radius * 0.05), Color.BLACK)
 	draw_circle(Vector2(body_radius * 0.32, -body_radius * 0.10), maxf(1.5, body_radius * 0.05), Color.BLACK)
 
-	# Health bar
-	var bar_width := body_radius * 2.2
-	var ratio: float = clampf(health / max_health, 0.0, 1.0)
-	var bar_rect := Rect2(Vector2(-bar_width / 2.0, -body_radius - 14.0), Vector2(bar_width, 7.0))
-	draw_rect(bar_rect, Color("402b2d"))
-	draw_rect(Rect2(bar_rect.position, Vector2(bar_width * ratio, 7.0)), Color("65d46e"))
-	_draw_status_icons(bar_rect.position + Vector2(0.0, -12.0))
+	if hit_flash_strength > 0.001:
+		var flash_color := Color(1.0, 1.0, 1.0, hit_flash_strength * 0.92)
+		if visual_type == &"fast":
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(0.0, -body_radius),
+				Vector2(body_radius, body_radius * 0.25),
+				Vector2(0.0, body_radius),
+				Vector2(-body_radius, body_radius * 0.25)
+			]), flash_color)
+		else:
+			draw_circle(Vector2.ZERO, body_radius, flash_color)
+	_draw_status_icons(Vector2(-body_radius * 0.45, -body_radius - 18.0))
+
+
+func has_health_bar_visual() -> bool:
+	return false
 
 
 func has_status_icon(status: StringName) -> bool:

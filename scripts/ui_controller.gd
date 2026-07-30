@@ -33,6 +33,7 @@ var gold_tween: Tween
 var base_tween: Tween
 var boss_warning_tween: Tween
 var ability_button: Button
+var ability_icon: ArrowRainAbilityIcon
 var pause_button: Button
 var pause_layer: CanvasLayer
 var pause_settings_layer: CanvasLayer
@@ -120,11 +121,17 @@ func _build_hud() -> void:
 	action_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	action_buttons_row.add_child(action_spacer)
 	ability_button = Button.new()
-	ability_button.custom_minimum_size = Vector2(280.0, 86.0)
-	ability_button.text = "OK YAĞMURU"
+	ability_button.custom_minimum_size = Vector2(210.0, 86.0)
+	ability_button.text = ""
+	ability_button.tooltip_text = "Ok Yağmuru"
 	ability_button.add_theme_font_size_override("font_size", 24)
 	ability_button.pressed.connect(func() -> void: ability_requested.emit())
 	action_buttons_row.add_child(ability_button)
+	ability_icon = ArrowRainAbilityIcon.new()
+	ability_icon.set_anchors_preset(Control.PRESET_CENTER)
+	ability_icon.position = Vector2(-46.0, -38.0)
+	ability_icon.size = Vector2(92.0, 76.0)
+	ability_button.add_child(ability_icon)
 	speed_button = Button.new()
 	speed_button.custom_minimum_size = Vector2(120.0, 86.0)
 	speed_button.text = "1×"
@@ -331,11 +338,13 @@ func update_ability_cooldown(remaining: float) -> void:
 	if not is_instance_valid(ability_button):
 		return
 	ability_button.disabled = remaining > 0.0
-	ability_button.text = (
-		"OK YAĞMURU\n%d sn" % int(ceil(remaining))
-		if remaining > 0.0 else "OK YAĞMURU\nHAZIR"
+	ability_button.text = "%d" % int(ceil(remaining)) if remaining > 0.0 else ""
+	ability_button.modulate = (
+		Color(0.72, 0.72, 0.72)
+		if remaining > 0.0 else Color("fff1a8")
 	)
-	ability_button.modulate = Color.WHITE if remaining > 0.0 else Color("fff1a8")
+	if is_instance_valid(ability_icon):
+		ability_icon.set_cooldown(remaining, ability_cooldown_duration)
 
 
 func set_ability_cooldown_duration(duration: float) -> void:

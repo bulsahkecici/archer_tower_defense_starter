@@ -178,15 +178,18 @@ func _run() -> void:
 
 	game.ui_controller.update_ability_cooldown(18.0)
 	_expect(
-		"18 sn" in game.ui_controller.ability_button.text
-		and game.ui_controller.ability_button.disabled,
-		"Ok Yağmuru cooldown metni gerçek kalan süreyi göstermeli"
+		game.ui_controller.ability_button.disabled
+		and game.ui_controller.ability_icon.ready_fill > 0.0
+		and game.ui_controller.ability_icon.ready_fill < 1.0
+		and not game.ui_controller.ability_icon.is_ready,
+		"Ok Yağmuru ikonu gerçek kalan süreyi progress olarak göstermeli"
 	)
 	game.ui_controller.update_ability_cooldown(0.0)
 	_expect(
-		"HAZIR" in game.ui_controller.ability_button.text
-		and not game.ui_controller.ability_button.disabled,
-		"Ok Yağmuru hazır durumu açık görünmeli"
+		not game.ui_controller.ability_button.disabled
+		and game.ui_controller.ability_icon.is_ready
+		and is_equal_approx(game.ui_controller.ability_icon.ready_fill, 1.0),
+		"Ok Yağmuru ikonunun hazır durumu tamamen dolu görünmeli"
 	)
 
 	Engine.time_scale = 2.0

@@ -57,9 +57,13 @@ func _create_game() -> Node:
 func _test_damage_and_death(game: Node) -> void:
 	var enemy: PathEnemy = game._spawn_enemy(WaveManager.NORMAL_ID)
 	enemy.take_damage(1.0)
-	_expect(enemy.modulate != Color.WHITE, "Hasar flash efekti başlamalı")
+	_expect(enemy.hit_flash_strength > 0.9, "Hasar beyaz flash efekti başlamalı")
 	await create_timer(0.16).timeout
-	_expect(enemy.modulate.is_equal_approx(Color.WHITE), "Hasar flash efekti güvenli bitmeli")
+	_expect(
+		enemy.hit_flash_strength <= 0.001
+		and enemy.modulate.is_equal_approx(Color.WHITE),
+		"Hasar flash efekti güvenli bitmeli"
+	)
 
 	var reward_before: int = game.economy.gold
 	var first_resolution: bool = enemy.resolve_defeated()
