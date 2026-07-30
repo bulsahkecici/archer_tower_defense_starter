@@ -8,6 +8,7 @@ var about_button: Button
 var endless_button: Button
 var achievements_button: Button
 var cosmetics_button: Button
+var tower_guide_button: Button
 var save_manager: Node
 var _ui_built: bool = false
 
@@ -56,6 +57,7 @@ func _build_ui() -> void:
 	endless_button = _button(buttons, "Sonsuz Mod")
 	level_select_button = _button(buttons, "Bölüm Seç")
 	achievements_button = _button(buttons, "Başarımlar")
+	tower_guide_button = _button(buttons, "Kule Rehberi")
 	cosmetics_button = _button(buttons, "Kozmetikler")
 	settings_button = _button(buttons, "Ayarlar")
 	about_button = _button(buttons, "Hakkında")
@@ -71,6 +73,12 @@ func _build_ui() -> void:
 	achievements_button.pressed.connect(
 		func() -> void:
 			MenuNavigation.change_scene(get_tree(), "res://scenes/achievements.tscn")
+	)
+	tower_guide_button.pressed.connect(
+		func() -> void:
+			MenuNavigation.open_with_return(
+				get_tree(), MenuNavigation.TOWER_GUIDE, &"tower_guide"
+			)
 	)
 	cosmetics_button.pressed.connect(
 		func() -> void:

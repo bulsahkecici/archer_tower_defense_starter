@@ -11,6 +11,6 @@
   <path d="M460 920V800c0-52 36-94 80-94s80 42 80 94v120z" fill="#0d3435"/>
   <path d="M335 1010L750 560" fill="none" stroke="#f7f0d0" stroke-width="32" stroke-linecap="round"/>
   <path d="M720 560l70-22-23 70zM335 1010l-36 73 74-37z" fill="#e2b65c"/>
-  <path d="M250 1190L280 1110l30 80m-48-30h36m42 30v-80h40q20 0 20 25t-20 25h-40m38 0l28 30m64-70q-12-10-28-10-32 0-32 40t32 40q16 0 28-10m30-70v80m60-80v80m-60-40h60m90-40h-60v80h60m-60-40h50m40 40v-80h40q20 0 20 25t-20 25h-40m38 0l28 30" fill="none" stroke="#fff2c2" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M0 0h60m-30 0v100m45-50q0-50 30-50t30 50-30 50-30-50m75-50 15 100 15-65 15 65 15-100m75 0h-60v100h60m-60-50h50m40 50V0h40q20 0 20 25t-20 25h-40m38 0 28 50m72 0V0h32q28 0 28 50t-28 50h-32m135-100h-60v100h60m-60-50h50m40 50V0h60m-60 50h50m40-50h60m-60 50h50m-50 50h60m40 0V0l60 100V0m90 10q-12-10-28-10-32 0-32 25t32 25q32 0 32 25t-32 25q-16 0-28-10m118-90h-60v100h60m-60-50h50" transform="translate(240 1305) scale(.65)" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="540" y="1210" text-anchor="middle" fill="#fff2c2" font-family="sans-serif" font-size="88" font-weight="700">OKÇULARIN</text>
+  <text x="540" y="1320" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="84" font-weight="700">SON KALESİ</text>
 </svg>

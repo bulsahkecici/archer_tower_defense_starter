@@ -4,7 +4,7 @@
 
 Draft last updated: July 29, 2026
 
-This version of Archer Tower Defense does not create user accounts and does
+This version of Okçuların Son Kalesi does not create user accounts and does
 not include advertising, analytics, or tracking SDKs. It does not request
 access to location, camera, microphone, photo library, or contacts. It does
 not send gameplay data to a server.

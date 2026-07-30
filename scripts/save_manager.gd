@@ -25,6 +25,7 @@ var selected_cosmetics: Dictionary = {
 var selected_game_mode: StringName = &"story"
 var loaded_save_version: int = CURRENT_SAVE_VERSION
 var future_version_detected: bool = false
+var haptic_request_count: int = 0
 
 
 func _ready() -> void:
@@ -111,13 +112,13 @@ func _apply_dictionary(data: Dictionary) -> void:
 	loaded_save_version = int(data.get("save_version", CURRENT_SAVE_VERSION))
 	unlocked_level = clampi(int(data.get("unlocked_level", 1)), 1, 5)
 	level_stars = data.get("level_stars", {}) as Dictionary
-	music_volume = clampf(float(data.get("music_volume", 0.8)), 0.0, 1.0)
-	sfx_volume = clampf(float(data.get("sfx_volume", 0.9)), 0.0, 1.0)
-	vibration_enabled = bool(data.get("vibration_enabled", true))
+	music_volume = _safe_volume(data.get("music_volume"), 0.8)
+	sfx_volume = _safe_volume(data.get("sfx_volume"), 0.9)
+	vibration_enabled = _safe_bool(data.get("vibration_enabled"), true)
 	first_launch = bool(data.get("first_launch", false))
 	last_level = clampi(int(data.get("last_level", 1)), 1, unlocked_level)
 	tutorial_completed = bool(data.get("tutorial_completed", not first_launch))
-	screen_shake_enabled = bool(data.get("screen_shake_enabled", true))
+	screen_shake_enabled = _safe_bool(data.get("screen_shake_enabled"), true)
 	endless_high_wave = maxi(0, int(data.get("endless_high_wave", 0)))
 	achievement_progress = data.get("achievement_progress", {}) as Dictionary
 	unlocked_achievements.clear()
@@ -146,6 +147,28 @@ func reset_defaults() -> void:
 	selected_game_mode = &"story"
 	loaded_save_version = CURRENT_SAVE_VERSION
 	future_version_detected = false
+	haptic_request_count = 0
+
+
+func request_haptic(duration_ms: int = 20) -> bool:
+	if not vibration_enabled or not OS.has_feature("mobile"):
+		return false
+	Input.vibrate_handheld(clampi(duration_ms, 1, 500))
+	haptic_request_count += 1
+	return true
+
+
+func _safe_volume(value: Variant, fallback: float) -> float:
+	if not value is float and not value is int:
+		return fallback
+	var numeric: float = float(value)
+	if is_nan(numeric) or is_inf(numeric):
+		return fallback
+	return clampf(numeric, 0.0, 1.0)
+
+
+func _safe_bool(value: Variant, fallback: bool) -> bool:
+	return value as bool if value is bool else fallback
 
 
 func is_level_unlocked(level_id: int) -> bool:

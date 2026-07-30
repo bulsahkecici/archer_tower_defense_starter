@@ -10,6 +10,8 @@ var screen_shake_toggle: CheckButton
 var save_manager: Node
 var audio_manager: Node
 var back_button: Button
+var music_row: HBoxContainer
+var sfx_row: HBoxContainer
 var embedded_mode: bool = false
 var _ui_built: bool = false
 
@@ -39,24 +41,30 @@ func _build_ui() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var content := VBoxContainer.new()
-	content.custom_minimum_size = Vector2(720.0, 0.0)
-	content.add_theme_constant_override("separation", 30)
+	content.custom_minimum_size = Vector2(640.0, 0.0)
+	content.add_theme_constant_override("separation", 22)
 	center.add_child(content)
 	var title := Label.new()
 	title.text = "AYARLAR"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 54)
 	content.add_child(title)
-	music_slider = _add_slider(content, "Müzik")
-	sfx_slider = _add_slider(content, "Efekt")
+	var music_result: Array = _add_slider(content, "Müzik")
+	music_row = music_result[0] as HBoxContainer
+	music_slider = music_result[1] as HSlider
+	var sfx_result: Array = _add_slider(content, "Efekt")
+	sfx_row = sfx_result[0] as HBoxContainer
+	sfx_slider = sfx_result[1] as HSlider
 	vibration_toggle = CheckButton.new()
 	vibration_toggle.text = "Titreşim"
-	vibration_toggle.custom_minimum_size = Vector2(620.0, 90.0)
+	vibration_toggle.custom_minimum_size = Vector2(0.0, 108.0)
+	vibration_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vibration_toggle.add_theme_font_size_override("font_size", 30)
 	content.add_child(vibration_toggle)
 	screen_shake_toggle = CheckButton.new()
 	screen_shake_toggle.text = "Ekran Sarsıntısı"
-	screen_shake_toggle.custom_minimum_size = Vector2(620.0, 90.0)
+	screen_shake_toggle.custom_minimum_size = Vector2(0.0, 108.0)
+	screen_shake_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	screen_shake_toggle.add_theme_font_size_override("font_size", 30)
 	content.add_child(screen_shake_toggle)
 	back_button = Button.new()
@@ -71,18 +79,25 @@ func _build_ui() -> void:
 	back_button.pressed.connect(_go_back)
 
 
-func _add_slider(parent: Control, label_text: String) -> HSlider:
+func _add_slider(parent: Control, label_text: String) -> Array:
+	var row := HBoxContainer.new()
+	row.custom_minimum_size = Vector2(0.0, 108.0)
+	row.add_theme_constant_override("separation", 24)
+	parent.add_child(row)
 	var label := Label.new()
 	label.text = label_text
+	label.custom_minimum_size = Vector2(180.0, 0.0)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 30)
-	parent.add_child(label)
+	row.add_child(label)
 	var slider := HSlider.new()
 	slider.min_value = 0.0
 	slider.max_value = 1.0
 	slider.step = 0.05
-	slider.custom_minimum_size = Vector2(620.0, 72.0)
-	parent.add_child(slider)
-	return slider
+	slider.custom_minimum_size = Vector2(0.0, 96.0)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(slider)
+	return [row, slider]
 
 
 func _apply_saved_values() -> void:

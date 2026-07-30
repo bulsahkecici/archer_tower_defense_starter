@@ -2,7 +2,7 @@
 
 ## Name
 
-Archer Tower Defense `[verify the final name]`
+Okçuların Son Kalesi
 
 ## Subtitle
 

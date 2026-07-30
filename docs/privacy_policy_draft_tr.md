@@ -4,7 +4,7 @@
 
 Son güncelleme taslağı: 29 Temmuz 2026
 
-Archer Tower Defense’ın bu sürümü kullanıcı hesabı oluşturmaz; reklam, analitik
+Okçuların Son Kalesi’nin bu sürümü kullanıcı hesabı oluşturmaz; reklam, analitik
 ve takip SDK’sı içermez. Konum, kamera, mikrofon, fotoğraf arşivi veya kişiler
 için izin istemez. Oyun verilerini bir sunucuya göndermez.
 

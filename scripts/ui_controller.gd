@@ -16,12 +16,15 @@ const TutorialOverlayScript = preload("res://scripts/tutorial_overlay.gd")
 const RewardChoicePanelScript = preload("res://scripts/reward_choice_panel.gd")
 const PerformancePanelScript = preload("res://scripts/performance_panel.gd")
 const SettingsMenuScript = preload("res://scripts/settings.gd")
+const TowerGuideScript = preload("res://scripts/tower_guide.gd")
 
 var interface_layer: CanvasLayer
 var gold_label: Label
 var wave_label: Label
 var base_label: Label
 var message_label: Label
+var message_panel: PanelContainer
+var message_tween: Tween
 var help_label: Label
 var boss_warning_label: Label
 var game_over_layer: CanvasLayer
@@ -34,6 +37,8 @@ var pause_button: Button
 var pause_layer: CanvasLayer
 var pause_settings_layer: CanvasLayer
 var pause_settings_menu: SettingsMenu
+var pause_guide_layer: CanvasLayer
+var pause_guide: TowerGuide
 var victory_layer: CanvasLayer
 var speed_button: Button
 var selected_speed: float = 1.0
@@ -54,6 +59,9 @@ var achievement_notification_tween: Tween
 var achievement_notification_count: int = 0
 var debug_panel: DebugPerformancePanel
 var last_summary_text: String = ""
+var primary_stats_row: HBoxContainer
+var action_buttons_row: HBoxContainer
+var gold_icon: CoinIcon
 
 
 func setup() -> void:
@@ -85,31 +93,79 @@ func _build_hud() -> void:
 	top_margin.offset_left = margins.x
 	top_margin.offset_top = margins.y
 	top_margin.offset_right = -margins.z
-	top_margin.offset_bottom = margins.y + 96.0
+	top_margin.offset_bottom = margins.y + 196.0
 	top_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	safe_ui.add_child(top_margin)
 
-	var top_row := HBoxContainer.new()
-	top_row.add_theme_constant_override("separation", 18)
-	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	top_margin.add_child(top_row)
-	gold_label = _create_hud_pill(top_row, Color("d59a32"))
-	wave_label = _create_hud_pill(top_row, Color("487ca8"))
-	base_label = _create_hud_pill(top_row, Color("b34f54"))
+	var top_vbox := VBoxContainer.new()
+	top_vbox.add_theme_constant_override("separation", 10)
+	top_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_margin.add_child(top_vbox)
+	primary_stats_row = HBoxContainer.new()
+	primary_stats_row.name = "PrimaryStatsRow"
+	primary_stats_row.add_theme_constant_override("separation", 12)
+	primary_stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_vbox.add_child(primary_stats_row)
+	gold_label = _create_gold_pill(primary_stats_row)
+	wave_label = _create_hud_pill(primary_stats_row, Color("487ca8"))
+	base_label = _create_hud_pill(primary_stats_row, Color("b34f54"))
 
+	action_buttons_row = HBoxContainer.new()
+	action_buttons_row.name = "ActionButtonsRow"
+	action_buttons_row.custom_minimum_size = Vector2(0.0, 88.0)
+	action_buttons_row.add_theme_constant_override("separation", 12)
+	top_vbox.add_child(action_buttons_row)
+	var action_spacer := Control.new()
+	action_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	action_buttons_row.add_child(action_spacer)
+	ability_button = Button.new()
+	ability_button.custom_minimum_size = Vector2(280.0, 86.0)
+	ability_button.text = "OK YAĞMURU"
+	ability_button.add_theme_font_size_override("font_size", 24)
+	ability_button.pressed.connect(func() -> void: ability_requested.emit())
+	action_buttons_row.add_child(ability_button)
+	speed_button = Button.new()
+	speed_button.custom_minimum_size = Vector2(120.0, 86.0)
+	speed_button.text = "1×"
+	speed_button.add_theme_font_size_override("font_size", 27)
+	speed_button.pressed.connect(_toggle_speed)
+	action_buttons_row.add_child(speed_button)
+	pause_button = Button.new()
+	pause_button.custom_minimum_size = Vector2(120.0, 86.0)
+	pause_button.text = "Ⅱ"
+	pause_button.add_theme_font_size_override("font_size", 29)
+	pause_button.pressed.connect(func() -> void: pause_requested.emit())
+	action_buttons_row.add_child(pause_button)
+
+	message_panel = PanelContainer.new()
+	message_panel.name = "MessagePanel"
+	message_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	message_panel.offset_left = margins.x + 68.0
+	message_panel.offset_top = margins.y + 342.0
+	message_panel.offset_right = -margins.z - 68.0
+	message_panel.offset_bottom = margins.y + 414.0
+	message_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var message_style := StyleBoxFlat.new()
+	message_style.bg_color = Color(0.025, 0.055, 0.07, 0.90)
+	message_style.border_color = Color(0.92, 0.77, 0.38, 0.82)
+	message_style.set_border_width_all(2)
+	message_style.set_corner_radius_all(20)
+	message_panel.add_theme_stylebox_override("panel", message_style)
+	safe_ui.add_child(message_panel)
 	message_label = Label.new()
-	message_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	message_label.position = Vector2(-370.0, margins.y + 116.0)
-	message_label.size = Vector2(740.0, 58.0)
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	message_label.add_theme_font_size_override("font_size", 30)
-	message_label.modulate = Color("ffe08a")
+	message_label.add_theme_color_override("font_color", Color("fff0b0"))
+	message_label.add_theme_color_override("font_outline_color", Color("152127"))
+	message_label.add_theme_constant_override("outline_size", 4)
 	message_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	safe_ui.add_child(message_label)
+	message_panel.add_child(message_label)
 
 	boss_warning_label = Label.new()
 	boss_warning_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	boss_warning_label.position = Vector2(-300.0, margins.y + 192.0)
+	boss_warning_label.position = Vector2(-300.0, margins.y + 424.0)
 	boss_warning_label.size = Vector2(600.0, 90.0)
 	boss_warning_label.text = "◆  BOSS YAKLAŞIYOR  ◆"
 	boss_warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -131,32 +187,6 @@ func _build_hud() -> void:
 	help_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	safe_ui.add_child(help_label)
 
-	ability_button = Button.new()
-	ability_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	ability_button.position = Vector2(-330.0 - margins.z, -190.0 - margins.w)
-	ability_button.size = Vector2(300.0, 100.0)
-	ability_button.text = "OK YAĞMURU"
-	ability_button.add_theme_font_size_override("font_size", 26)
-	ability_button.pressed.connect(func() -> void: ability_requested.emit())
-	safe_ui.add_child(ability_button)
-
-	pause_button = Button.new()
-	pause_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	pause_button.position = Vector2(-150.0 - margins.z, margins.y)
-	pause_button.size = Vector2(120.0, 82.0)
-	pause_button.text = "Ⅱ"
-	pause_button.add_theme_font_size_override("font_size", 30)
-	pause_button.pressed.connect(func() -> void: pause_requested.emit())
-	safe_ui.add_child(pause_button)
-
-	speed_button = Button.new()
-	speed_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	speed_button.position = Vector2(-290.0 - margins.z, margins.y)
-	speed_button.size = Vector2(120.0, 82.0)
-	speed_button.text = "1×"
-	speed_button.add_theme_font_size_override("font_size", 28)
-	speed_button.pressed.connect(_toggle_speed)
-	safe_ui.add_child(speed_button)
 	_build_boss_bar(safe_ui, margins)
 
 
@@ -164,9 +194,9 @@ func _build_boss_bar(parent: Control, margins: Vector4) -> void:
 	boss_bar_container = PanelContainer.new()
 	boss_bar_container.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	boss_bar_container.offset_left = margins.x + 160.0
-	boss_bar_container.offset_top = margins.y + 104.0
+	boss_bar_container.offset_top = margins.y + 210.0
 	boss_bar_container.offset_right = -margins.z - 160.0
-	boss_bar_container.offset_bottom = margins.y + 224.0
+	boss_bar_container.offset_bottom = margins.y + 330.0
 	boss_bar_container.visible = false
 	boss_bar_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
@@ -222,8 +252,39 @@ func _create_hud_pill(parent: Control, accent: Color) -> Label:
 	return label
 
 
+func _create_gold_pill(parent: Control) -> Label:
+	var panel := PanelContainer.new()
+	panel.name = "GoldDisplay"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.custom_minimum_size = Vector2(0.0, 88.0)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.08, 0.10, 0.90)
+	style.border_color = Color("d59a32")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(24)
+	style.content_margin_left = 14.0
+	style.content_margin_right = 14.0
+	panel.add_theme_stylebox_override("panel", style)
+	parent.add_child(panel)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(row)
+	gold_icon = CoinIcon.new()
+	row.add_child(gold_icon)
+	var label := Label.new()
+	label.name = "GoldValue"
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 34)
+	label.add_theme_color_override("font_color", Color("f8f4df"))
+	row.add_child(label)
+	return label
+
+
 func update_gold(current_gold: int, animate: bool = true) -> void:
-	gold_label.text = "●  %d" % current_gold
+	gold_label.text = str(current_gold)
 	if not animate:
 		return
 	if gold_tween != null and gold_tween.is_valid():
@@ -254,6 +315,16 @@ func update_status(
 
 func set_message(text: String) -> void:
 	message_label.text = text
+	message_panel.visible = not text.is_empty()
+	if text.is_empty():
+		return
+	if message_tween != null and message_tween.is_valid():
+		message_tween.kill()
+	message_panel.modulate.a = 0.0
+	message_tween = create_tween()
+	message_tween.tween_property(message_panel, "modulate:a", 1.0, 0.16)
+	message_tween.tween_interval(1.9)
+	message_tween.tween_property(message_panel, "modulate:a", 0.0, 0.28)
 
 
 func update_ability_cooldown(remaining: float) -> void:
@@ -557,6 +628,7 @@ func show_pause() -> CanvasLayer:
 	pause_layer = _create_action_layer("OYUN DURAKLATILDI", [
 		["Devam Et", func() -> void: resume_requested.emit()],
 		["Yeniden Başlat", func() -> void: restart_requested.emit()],
+		["Kule Rehberi", show_pause_guide],
 		["Ayarlar", show_pause_settings],
 		["Bölüm Seçimi", func() -> void: _change_scene_unpaused("res://scenes/level_select.tscn")],
 		["Ana Menü", func() -> void: _change_scene_unpaused("res://scenes/main_menu.tscn")]
@@ -567,6 +639,7 @@ func show_pause() -> CanvasLayer:
 
 func hide_pause() -> void:
 	hide_pause_settings()
+	hide_pause_guide()
 	if is_instance_valid(pause_layer):
 		pause_layer.queue_free()
 	pause_layer = null
@@ -593,6 +666,29 @@ func hide_pause_settings() -> void:
 		pause_settings_layer.queue_free()
 	pause_settings_layer = null
 	pause_settings_menu = null
+
+
+func show_pause_guide() -> TowerGuide:
+	if is_instance_valid(pause_guide):
+		return pause_guide
+	pause_guide_layer = CanvasLayer.new()
+	pause_guide_layer.name = "PauseGuideLayer"
+	pause_guide_layer.layer = 41
+	pause_guide_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(pause_guide_layer)
+	pause_guide = TowerGuideScript.new()
+	pause_guide.name = "PauseTowerGuide"
+	pause_guide.embedded_mode = true
+	pause_guide_layer.add_child(pause_guide)
+	pause_guide.close_requested.connect(hide_pause_guide)
+	return pause_guide
+
+
+func hide_pause_guide() -> void:
+	if is_instance_valid(pause_guide_layer):
+		pause_guide_layer.queue_free()
+	pause_guide_layer = null
+	pause_guide = null
 
 
 func show_victory(

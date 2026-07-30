@@ -120,31 +120,31 @@ func _build_interface() -> void:
 	cards.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	content.add_child(cards)
 
-	archer_button = _create_tower_card(cards, archer_data, false)
+	archer_button = _create_tower_card(cards, archer_data)
 	archer_button.pressed.connect(
 		func() -> void: tower_selected.emit(ShooterUnit.TowerType.ARCHER)
 	)
 	archer_button.mouse_entered.connect(
 		func() -> void: tower_previewed.emit(ShooterUnit.TowerType.ARCHER)
 	)
-	archer_cost_label = archer_button.get_node("Content/Cost") as Label
+	archer_cost_label = archer_button.get_node("Content/CostRow/Cost") as Label
 
-	crossbow_button = _create_tower_card(cards, crossbow_data, true)
+	crossbow_button = _create_tower_card(cards, crossbow_data)
 	crossbow_button.pressed.connect(
 		func() -> void: tower_selected.emit(ShooterUnit.TowerType.CROSSBOW)
 	)
 	crossbow_button.mouse_entered.connect(
 		func() -> void: tower_previewed.emit(ShooterUnit.TowerType.CROSSBOW)
 	)
-	crossbow_cost_label = crossbow_button.get_node("Content/Cost") as Label
+	crossbow_cost_label = crossbow_button.get_node("Content/CostRow/Cost") as Label
 
-	ice_button = _create_tower_card(cards, ice_data, false)
+	ice_button = _create_tower_card(cards, ice_data)
 	ice_button.pressed.connect(func() -> void: tower_selected.emit(ShooterUnit.TowerType.ICE))
 	ice_button.mouse_entered.connect(
 		func() -> void: tower_previewed.emit(ShooterUnit.TowerType.ICE)
 	)
 
-	bomb_button = _create_tower_card(cards, bomb_data, true)
+	bomb_button = _create_tower_card(cards, bomb_data)
 	bomb_button.pressed.connect(func() -> void: tower_selected.emit(ShooterUnit.TowerType.BOMB))
 	bomb_button.mouse_entered.connect(
 		func() -> void: tower_previewed.emit(ShooterUnit.TowerType.BOMB)
@@ -161,11 +161,10 @@ func _build_interface() -> void:
 
 func _create_tower_card(
 	parent: Control,
-	data: TowerData,
-	is_crossbow: bool
+	data: TowerData
 ) -> Button:
 	var card := Button.new()
-	card.custom_minimum_size = Vector2(360.0, 410.0)
+	card.custom_minimum_size = Vector2(360.0, 310.0)
 	card.text = ""
 	var normal_style := StyleBoxFlat.new()
 	normal_style.bg_color = Color(0.13, 0.22, 0.23, 0.96)
@@ -194,9 +193,10 @@ func _create_tower_card(
 	card.add_child(content)
 
 	var icon := Control.new()
+	icon.name = "Icon"
 	icon.custom_minimum_size = Vector2(160.0, 150.0)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.draw.connect(func() -> void: _draw_tower_icon(icon, data.accent, is_crossbow))
+	icon.draw.connect(func() -> void: _draw_tower_icon(icon, data))
 	content.add_child(icon)
 
 	var name_label := Label.new()
@@ -207,35 +207,29 @@ func _create_tower_card(
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(name_label)
 
-	var description_label := Label.new()
-	description_label.custom_minimum_size = Vector2(300.0, 132.0)
-	description_label.text = (
-		"Hasar %.0f  •  Menzil %.0f  •  Atış %.1f sn\n%s"
-		% [data.damage, data.attack_range, data.fire_interval, data.get_role_summary()]
-	)
-	description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	description_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	description_label.add_theme_font_size_override("font_size", 21)
-	description_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(description_label)
-
+	var cost_row := HBoxContainer.new()
+	cost_row.name = "CostRow"
+	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(cost_row)
+	var coin := CoinIcon.new()
+	cost_row.add_child(coin)
 	var cost_label := Label.new()
 	cost_label.name = "Cost"
-	cost_label.custom_minimum_size = Vector2(300.0, 42.0)
+	cost_label.custom_minimum_size = Vector2(90.0, 42.0)
 	cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cost_label.add_theme_font_size_override("font_size", 26)
 	cost_label.modulate = Color("f5ca62")
 	cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(cost_label)
+	cost_row.add_child(cost_label)
 	return card
 
 
-func _draw_tower_icon(icon: Control, accent: Color, is_crossbow: bool) -> void:
+func _draw_tower_icon(icon: Control, data: TowerData) -> void:
 	var center := Vector2(icon.size.x * 0.5, 75.0)
 	icon.draw_circle(center + Vector2(0.0, 53.0), 55.0, Color(0.08, 0.11, 0.13, 0.22))
-	icon.draw_rect(Rect2(center + Vector2(-38.0, -19.0), Vector2(76.0, 82.0)), accent)
-	if is_crossbow:
+	icon.draw_rect(Rect2(center + Vector2(-38.0, -19.0), Vector2(76.0, 82.0)), data.accent)
+	if data.is_heavy_projectile:
 		icon.draw_line(center + Vector2(-53.0, -28.0), center + Vector2(53.0, -28.0), Color("a8dce5"), 11.0)
 		icon.draw_line(center + Vector2(-38.0, -51.0), center + Vector2(38.0, -5.0), Color("263b52"), 8.0)
 		icon.draw_line(center + Vector2(38.0, -51.0), center + Vector2(-38.0, -5.0), Color("263b52"), 8.0)
@@ -244,7 +238,7 @@ func _draw_tower_icon(icon: Control, accent: Color, is_crossbow: bool) -> void:
 			center + Vector2(-52.0, -13.0),
 			center + Vector2(0.0, -60.0),
 			center + Vector2(52.0, -13.0)
-		]), accent.lightened(0.16))
+		]), data.accent.lightened(0.16))
 		icon.draw_arc(center + Vector2(24.0, -29.0), 28.0, -1.25, 1.25, 18, Color("8b5d2c"), 6.0)
 	icon.draw_rect(Rect2(center + Vector2(-13.0, 17.0), Vector2(26.0, 46.0)), Color("413225"))
 
@@ -273,16 +267,16 @@ func _on_gold_changed(_current_gold: int) -> void:
 func _refresh_affordability() -> void:
 	var archer_cost: int = get_tower_cost(ShooterUnit.TowerType.ARCHER)
 	var crossbow_cost: int = get_tower_cost(ShooterUnit.TowerType.CROSSBOW)
-	archer_cost_label.text = "● %d ALTIN" % archer_cost
-	crossbow_cost_label.text = "● %d ALTIN" % crossbow_cost
+	archer_cost_label.text = str(archer_cost)
+	crossbow_cost_label.text = str(crossbow_cost)
 	archer_button.disabled = not economy.can_afford(archer_cost)
 	crossbow_button.disabled = not economy.can_afford(crossbow_cost)
 	var ice_cost: int = get_tower_cost(ShooterUnit.TowerType.ICE)
 	var bomb_cost: int = get_tower_cost(ShooterUnit.TowerType.BOMB)
-	var ice_label: Label = ice_button.get_node("Content/Cost") as Label
-	var bomb_label: Label = bomb_button.get_node("Content/Cost") as Label
-	ice_label.text = "● %d ALTIN" % ice_cost
-	bomb_label.text = "● %d ALTIN" % bomb_cost
+	var ice_label: Label = ice_button.get_node("Content/CostRow/Cost") as Label
+	var bomb_label: Label = bomb_button.get_node("Content/CostRow/Cost") as Label
+	ice_label.text = str(ice_cost)
+	bomb_label.text = str(bomb_cost)
 	ice_button.disabled = not economy.can_afford(ice_cost)
 	bomb_button.disabled = not economy.can_afford(bomb_cost)
 

@@ -36,4 +36,5 @@ func set_sfx_volume(value: float) -> void:
 func _set_bus_volume(bus_name: String, linear: float) -> void:
 	var index: int = AudioServer.get_bus_index(bus_name)
 	if index >= 0:
+		AudioServer.set_bus_mute(index, linear <= 0.0001)
 		AudioServer.set_bus_volume_db(index, linear_to_db(maxf(0.001, linear)))

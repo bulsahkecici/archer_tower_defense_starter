@@ -1,4 +1,4 @@
-# Archer Tower Defense Starter
+# Okçuların Son Kalesi
 
 
 ## Özellikler
@@ -113,7 +113,7 @@ bir iOS export preset içerir. `assets/app_icon.svg` ve `assets/splash.svg`
 
 Yayın öncesinde kullanıcı tarafından doldurulması veya doğrulanması gerekenler:
 
-- Nihai oyun adı
+- App Store Connect üzerinde “Okçuların Son Kalesi” adının uygunluğu
 - Benzersiz ve kullanıcıya ait Bundle ID
 - 10 karakterli Apple Team ID
 - App Store kategori ve yaş derecelendirmesi

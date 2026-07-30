@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- [ ] Nihai uygulama adı: `[DOLDUR]`
+- [ ] Nihai uygulama adı: `Okçuların Son Kalesi`
 - [ ] Alt başlık (30 karakter sınırını doğrula): `[DOLDUR]`
 - [ ] Türkçe ve İngilizce açıklamalar gözden geçirildi
 - [ ] Anahtar kelimeler: `[DOLDUR]`

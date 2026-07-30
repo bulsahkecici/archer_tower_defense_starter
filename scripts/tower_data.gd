@@ -29,6 +29,7 @@ var explosion_radius: float
 var role_description: String
 var special_effect: String
 var strong_against: String
+var weak_against: String
 var critical_chance: float
 var critical_multiplier: float
 
@@ -68,7 +69,8 @@ func _init(
 	new_special_effect: String = "Yok",
 	new_strong_against: String = "Normal düşmanlar",
 	new_critical_chance: float = 0.0,
-	new_critical_multiplier: float = 1.0
+	new_critical_multiplier: float = 1.0,
+	new_weak_against: String = "Özel bir zayıflığı yok"
 ) -> void:
 	id = new_id
 	display_name = new_display_name
@@ -96,6 +98,7 @@ func _init(
 	role_description = new_role_description
 	special_effect = new_special_effect
 	strong_against = new_strong_against
+	weak_against = new_weak_against
 	critical_chance = clampf(new_critical_chance, 0.0, 1.0)
 	critical_multiplier = maxf(1.0, new_critical_multiplier)
 
@@ -133,6 +136,31 @@ func get_role_summary() -> String:
 	]
 
 
+func get_guide_text() -> String:
+	var level_lines: Array[String] = []
+	for level in range(1, maximum_level + 1):
+		level_lines.append(
+			"Seviye %d — Hasar %.1f • Menzil %.0f • Saldırı aralığı %.2f sn"
+			% [
+				level,
+				get_damage(level),
+				get_attack_range(level),
+				get_fire_interval(level)
+			]
+		)
+	return (
+		"%s\n%s\n\n%s\nÖzel özellik: %s\n%s\n\nGüçlü: %s\nZayıf: %s"
+	) % [
+		display_name,
+		description,
+		"\n".join(level_lines),
+		special_effect,
+		role_description,
+		strong_against,
+		weak_against
+	]
+
+
 static func create_archer() -> TowerData:
 	return TowerData.new(
 		ARCHER_ID, "Okçu Kulesi", "Dengeli ve çevik",
@@ -140,7 +168,8 @@ static func create_archer() -> TowerData:
 		[20, 35], [1.0, 1.5, 2.2], [1.0, 1.0714286, 1.1607143],
 		[1.0, 0.875, 0.725], 0.70, 0.0, 0.0, 0.0,
 		"Genel amaçlı • Dengeli hasar ve hız",
-		"%10 kritik vuruş", "Normal ve hızlı düşmanlar", 0.10, 1.6
+		"%10 kritik vuruş", "Normal ve hızlı düşmanlar", 0.10, 1.6,
+		"Yoğun zırhlı hedefler"
 	)
 
 
@@ -150,7 +179,8 @@ static func create_crossbow() -> TowerData:
 		28.0, 418.0, 1.6, 900.0, 15, true, &"crossbow", Color("526d96"),
 		[35, 55], [1.0, 1.5357143, 2.3214286], [1.0, 1.076555, 1.160287],
 		[1.0, 0.8875, 0.7625], 0.70, 0.0, 0.0, 0.0,
-		"Yavaş ama ağır hasar", "Ağır mermi", "Boss ve zırhlı düşmanlar"
+		"Yavaş ama ağır hasar", "Ağır mermi", "Boss ve zırhlı düşmanlar",
+		0.0, 1.0, "Kalabalık ve hızlı sürüler"
 	)
 
 
@@ -160,7 +190,8 @@ static func create_ice() -> TowerData:
 		6.0, 350.0, 1.05, 720.0, 20, false, &"ice", Color("72cfe8"),
 		[28, 42], [1.0, 1.55, 2.2], [1.0, 1.08, 1.16],
 		[1.0, 0.88, 0.75], 0.70, 0.25, 1.5, 0.0,
-		"Destek kulesi", "%25 yavaşlatma", "Hızlı düşmanlar"
+		"Destek kulesi", "%25 yavaşlatma", "Hızlı düşmanlar",
+		0.0, 1.0, "Yüksek canı tek hedefler"
 	)
 
 
@@ -170,8 +201,13 @@ static func create_bomb() -> TowerData:
 		35.0, 370.0, 2.1, 620.0, 30, true, &"bomb", Color("d87942"),
 		[45, 65], [1.0, 1.5, 2.15], [1.0, 1.08, 1.16],
 		[1.0, 0.88, 0.74], 0.70, 0.0, 0.0, 95.0,
-		"Kalabalık gruplara karşı güçlü", "95 alan hasarı", "Sürü düşmanları"
+		"Kalabalık gruplara karşı güçlü", "95 alan hasarı", "Sürü düşmanları",
+		0.0, 1.0, "Hızlı ve dağınık hedefler"
 	)
+
+
+static func create_catalog() -> Array[TowerData]:
+	return [create_archer(), create_crossbow(), create_ice(), create_bomb()]
 
 
 static func create_for_id(tower_id: StringName) -> TowerData:
