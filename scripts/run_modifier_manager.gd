@@ -72,6 +72,13 @@ func get_reward_choices(wave: int) -> Array[Dictionary]:
 	return choices
 
 
+func is_reward_wave(wave: int, endless: bool = false) -> bool:
+	return (
+		wave in REWARD_WAVES
+		or (endless and wave > 0 and wave % 3 == 0)
+	)
+
+
 func apply_reward(
 	reward_id: StringName,
 	economy: EconomyManager,

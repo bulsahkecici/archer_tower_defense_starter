@@ -45,6 +45,9 @@ var tracked_bosses: Array[Node] = []
 var ability_cooldown_duration: float = 25.0
 var reward_layer: CanvasLayer
 var reward_panel: RewardChoicePanel
+var achievement_notification: PanelContainer
+var achievement_notification_tween: Tween
+var achievement_notification_count: int = 0
 
 
 func setup() -> void:
@@ -345,6 +348,55 @@ func hide_reward_choices() -> void:
 	reward_panel = null
 
 
+func show_achievement_notification(
+	_achievement_id: StringName,
+	title: String
+) -> void:
+	if is_instance_valid(achievement_notification):
+		achievement_notification.queue_free()
+	achievement_notification = PanelContainer.new()
+	achievement_notification.name = "AchievementNotification"
+	achievement_notification.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	achievement_notification.position = Vector2(-330.0, 260.0)
+	achievement_notification.size = Vector2(660.0, 100.0)
+	achievement_notification.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.12, 0.14, 0.96)
+	style.border_color = Color("ffd667")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(24)
+	achievement_notification.add_theme_stylebox_override("panel", style)
+	var label := Label.new()
+	label.text = "BAŞARIM AÇILDI\n%s" % title
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 25)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	achievement_notification.add_child(label)
+	interface_layer.add_child(achievement_notification)
+	achievement_notification_count += 1
+	achievement_notification.modulate.a = 0.0
+	achievement_notification_tween = create_tween()
+	achievement_notification_tween.tween_property(
+		achievement_notification,
+		"modulate:a",
+		1.0,
+		0.18
+	)
+	achievement_notification_tween.tween_interval(1.8)
+	achievement_notification_tween.tween_property(
+		achievement_notification,
+		"modulate:a",
+		0.0,
+		0.25
+	)
+	achievement_notification_tween.tween_callback(
+		func() -> void:
+			if is_instance_valid(achievement_notification):
+				achievement_notification.queue_free()
+	)
+
+
 func register_boss(enemy: Node) -> void:
 	if not is_instance_valid(enemy) or enemy in tracked_bosses:
 		return
@@ -592,3 +644,8 @@ func reset() -> void:
 	if is_instance_valid(boss_bar_container):
 		boss_bar_container.visible = false
 	set_speed(1.0)
+	if achievement_notification_tween != null and achievement_notification_tween.is_valid():
+		achievement_notification_tween.kill()
+	if is_instance_valid(achievement_notification):
+		achievement_notification.queue_free()
+	achievement_notification = null

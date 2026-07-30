@@ -20,6 +20,7 @@ var current_wave: int = 0
 var spawn_queue: Array[StringName] = []
 var enemy_definitions: Dictionary[StringName, EnemyData] = {}
 var level_id: int = 1
+var endless_mode: bool = false
 
 
 func _ready() -> void:
@@ -55,6 +56,10 @@ func get_enemy_data(enemy_id: StringName) -> EnemyData:
 
 func configure_level(current_level_id: int) -> void:
 	level_id = clampi(current_level_id, 1, 5)
+
+
+func configure_endless(enabled: bool) -> void:
+	endless_mode = enabled
 
 
 func begin_wave(wave_number: int) -> void:
@@ -98,6 +103,8 @@ func reset() -> void:
 
 
 func get_wave_composition(wave_number: int) -> Array[StringName]:
+	if endless_mode:
+		return get_endless_composition(wave_number)
 	var composition: Array[StringName] = []
 	match wave_number:
 		1:
@@ -130,6 +137,20 @@ func get_wave_composition(wave_number: int) -> Array[StringName]:
 	return composition
 
 
+func get_endless_composition(wave_number: int) -> Array[StringName]:
+	var safe_wave: int = maxi(1, wave_number)
+	var composition: Array[StringName] = []
+	_append_enemies(composition, NORMAL_ID, mini(10 + int(safe_wave / 2), 28))
+	_append_enemies(composition, FAST_ID, mini(2 + int(safe_wave / 4), 14))
+	if safe_wave >= 4:
+		_append_enemies(composition, ARMORED_ID, mini(1 + int(safe_wave / 6), 10))
+	if safe_wave >= 7:
+		_append_enemies(composition, SWARM_ID, mini(3 + int(safe_wave / 4), 18))
+	if safe_wave % 5 == 0:
+		composition.append(BOSS_ID)
+	return composition
+
+
 func _apply_level_composition(
 	composition: Array[StringName],
 	wave_number: int
@@ -156,6 +177,8 @@ func get_wave_summary(wave_number: int) -> Dictionary:
 
 func get_health_multiplier(wave_number: int) -> float:
 	var safe_wave: int = maxi(1, wave_number)
+	if endless_mode:
+		return minf(25.0, 1.0 + float(safe_wave - 1) * 0.10)
 	if safe_wave <= 10:
 		return pow(1.075, float(safe_wave - 1))
 	var first_ten_multiplier: float = pow(1.075, 9.0)

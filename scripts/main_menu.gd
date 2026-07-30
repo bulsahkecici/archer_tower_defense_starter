@@ -5,6 +5,9 @@ var start_button: Button
 var level_select_button: Button
 var settings_button: Button
 var about_button: Button
+var endless_button: Button
+var achievements_button: Button
+var cosmetics_button: Button
 var save_manager: Node
 
 
@@ -35,12 +38,29 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 58)
 	content.add_child(title)
 	start_button = _button(content, "Oyuna Başla")
+	endless_button = _button(content, "Sonsuz Mod")
 	level_select_button = _button(content, "Bölüm Seç")
+	achievements_button = _button(content, "Başarımlar")
+	cosmetics_button = _button(content, "Kozmetikler")
 	settings_button = _button(content, "Ayarlar")
 	about_button = _button(content, "Hakkında")
 	start_button.pressed.connect(func() -> void: _start_level(save_manager.last_level))
+	endless_button.disabled = not save_manager.is_endless_unlocked()
+	endless_button.text = (
+		"Sonsuz Mod  •  Rekor %d" % save_manager.endless_high_wave
+		if save_manager.is_endless_unlocked() else "Sonsuz Mod  •  KİLİTLİ"
+	)
+	endless_button.pressed.connect(_start_endless)
 	level_select_button.pressed.connect(_open_level_select)
 	settings_button.pressed.connect(_show_settings)
+	achievements_button.pressed.connect(
+		func() -> void:
+			get_tree().change_scene_to_file("res://scenes/achievements.tscn")
+	)
+	cosmetics_button.pressed.connect(
+		func() -> void:
+			get_tree().change_scene_to_file("res://scenes/cosmetics.tscn")
+	)
 	about_button.pressed.connect(func() -> void: title.text = "Özgün Godot kule savunması")
 
 
@@ -57,7 +77,16 @@ func _start_level(level_id: int) -> bool:
 	if not save_manager.is_level_unlocked(level_id):
 		return false
 	save_manager.last_level = level_id
+	save_manager.selected_game_mode = &"story"
 	save_manager.save_data()
+	get_tree().change_scene_to_file("res://main.tscn")
+	return true
+
+
+func _start_endless() -> bool:
+	if not save_manager.is_endless_unlocked():
+		return false
+	save_manager.selected_game_mode = &"endless"
 	get_tree().change_scene_to_file("res://main.tscn")
 	return true
 

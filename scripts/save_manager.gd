@@ -11,6 +11,16 @@ var first_launch: bool = true
 var last_level: int = 1
 var tutorial_completed: bool = false
 var screen_shake_enabled: bool = true
+var endless_high_wave: int = 0
+var achievement_progress: Dictionary = {}
+var unlocked_achievements: Array[String] = []
+var selected_cosmetics: Dictionary = {
+	"arrow_trail": "default_arrow",
+	"castle_roof": "green_roof",
+	"tower_accent": "",
+	"road_flags": ""
+}
+var selected_game_mode: StringName = &"story"
 
 
 func _ready() -> void:
@@ -80,6 +90,10 @@ func to_dictionary() -> Dictionary:
 		"last_level": last_level,
 		"tutorial_completed": tutorial_completed,
 		"screen_shake_enabled": screen_shake_enabled
+		,"endless_high_wave": endless_high_wave
+		,"achievement_progress": achievement_progress
+		,"unlocked_achievements": unlocked_achievements
+		,"selected_cosmetics": selected_cosmetics
 	}
 
 
@@ -93,6 +107,14 @@ func _apply_dictionary(data: Dictionary) -> void:
 	last_level = clampi(int(data.get("last_level", 1)), 1, unlocked_level)
 	tutorial_completed = bool(data.get("tutorial_completed", not first_launch))
 	screen_shake_enabled = bool(data.get("screen_shake_enabled", true))
+	endless_high_wave = maxi(0, int(data.get("endless_high_wave", 0)))
+	achievement_progress = data.get("achievement_progress", {}) as Dictionary
+	unlocked_achievements.clear()
+	for achievement_id in data.get("unlocked_achievements", []):
+		unlocked_achievements.append(String(achievement_id))
+	selected_cosmetics = data.get("selected_cosmetics", {}) as Dictionary
+	_ensure_cosmetic_defaults()
+	selected_game_mode = &"story"
 
 
 func reset_defaults() -> void:
@@ -105,6 +127,12 @@ func reset_defaults() -> void:
 	last_level = 1
 	tutorial_completed = false
 	screen_shake_enabled = true
+	endless_high_wave = 0
+	achievement_progress = {}
+	unlocked_achievements = []
+	selected_cosmetics = {}
+	_ensure_cosmetic_defaults()
+	selected_game_mode = &"story"
 
 
 func is_level_unlocked(level_id: int) -> bool:
@@ -139,3 +167,27 @@ func complete_tutorial() -> void:
 	tutorial_completed = true
 	first_launch = false
 	save_data()
+
+
+func is_endless_unlocked() -> bool:
+	return get_level_stars(5) > 0
+
+
+func update_endless_high_wave(wave: int) -> bool:
+	var safe_wave: int = maxi(0, wave)
+	if safe_wave <= endless_high_wave:
+		return false
+	endless_high_wave = safe_wave
+	save_data()
+	return true
+
+
+func _ensure_cosmetic_defaults() -> void:
+	if not selected_cosmetics.has("arrow_trail"):
+		selected_cosmetics["arrow_trail"] = "default_arrow"
+	if not selected_cosmetics.has("castle_roof"):
+		selected_cosmetics["castle_roof"] = "green_roof"
+	if not selected_cosmetics.has("tower_accent"):
+		selected_cosmetics["tower_accent"] = ""
+	if not selected_cosmetics.has("road_flags"):
+		selected_cosmetics["road_flags"] = ""

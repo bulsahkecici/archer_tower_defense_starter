@@ -38,6 +38,15 @@ var world_shake_tween: Tween
 var damage_number_spawn_count: int = 0
 var reward_pending: bool = false
 var run_modifier_manager: RunModifierManager
+var endless_mode: bool = false
+var achievement_manager: Node
+var enemies_defeated: int = 0
+var bosses_defeated: int = 0
+var towers_built_count: int = 0
+var upgrades_count: int = 0
+var towers_sold_count: int = 0
+var arrow_rain_uses: int = 0
+var tower_type_build_counts: Dictionary[StringName, int] = {}
 
 var base: DefenseBase
 var archer: ShooterUnit
@@ -74,10 +83,18 @@ func _ready() -> void:
 	Engine.time_scale = 1.0
 	add_to_group("gameplay_root")
 	save_manager = get_node("/root/SaveManager")
+	achievement_manager = get_node("/root/AchievementManager")
+	endless_mode = (
+		save_manager.selected_game_mode == &"endless"
+		and save_manager.is_endless_unlocked()
+	)
 	var catalog: Array[LevelData] = LevelData.create_catalog()
-	var selected_level: int = clampi(save_manager.last_level, 1, catalog.size())
+	var selected_level: int = (
+		catalog.size()
+		if endless_mode else clampi(save_manager.last_level, 1, catalog.size())
+	)
 	level_data = catalog[selected_level - 1]
-	total_waves = level_data.total_waves
+	total_waves = 0 if endless_mode else level_data.total_waves
 	economy = EconomyScript.new()
 	add_child(economy)
 	economy.gold_changed.connect(_on_gold_changed)
@@ -85,6 +102,7 @@ func _ready() -> void:
 	wave_manager = WaveManagerScript.new()
 	add_child(wave_manager)
 	wave_manager.configure_level(level_data.id)
+	wave_manager.configure_endless(endless_mode)
 
 	_create_world()
 	_create_controllers()
@@ -149,6 +167,9 @@ func _create_controllers() -> void:
 	ui_controller.wave_preview_ready.connect(_begin_previewed_wave)
 	ui_controller.tutorial_skipped.connect(_complete_tutorial)
 	ui_controller.reward_selected.connect(_on_reward_selected)
+	achievement_manager.achievement_unlocked.connect(
+		ui_controller.show_achievement_notification
+	)
 	ui_controller.set_ability_cooldown_duration(ABILITY_COOLDOWN)
 
 	run_modifier_manager = RunModifierManagerScript.new()
@@ -209,7 +230,9 @@ func _process(delta: float) -> void:
 				spawn_cooldown = spawn_interval
 		WaveManager.WaveState.ACTIVE:
 			if active_enemy_count == 0 and wave_manager.mark_completed():
-				if wave >= total_waves:
+				if endless_mode:
+					achievement_manager.record_event(&"endless_wave", wave)
+				elif wave >= total_waves:
 					_finish_victory()
 					return
 				intermission = 3.0
@@ -236,7 +259,7 @@ func _queue_next_wave_preview() -> void:
 		or tutorial_active
 		or wave_preview_pending
 		or wave_manager.state != WaveManager.WaveState.WAITING
-		or wave >= total_waves
+		or (not endless_mode and wave >= total_waves)
 	):
 		return
 	wave += 1
@@ -296,7 +319,7 @@ func _spawn_enemy(enemy_id: StringName) -> PathEnemy:
 	enemy.defeated.connect(
 		func(reward: int, world_position: Vector2) -> void:
 			ui_controller.unregister_boss(enemy)
-			_on_enemy_defeated(reward, world_position)
+			_on_enemy_defeated(reward, world_position, enemy.is_boss)
 	)
 	enemy.reached_base.connect(
 		func(damage: int) -> void:
@@ -356,10 +379,19 @@ func _on_enemy_slow_applied(world_position: Vector2) -> void:
 	add_child(slow_effect)
 	slow_effect.global_position = world_position
 	slow_effect.setup_status_flash(Color("9cecff"))
+	achievement_manager.record_event(&"enemy_slowed")
 
-func _on_enemy_defeated(reward: int, world_position: Vector2) -> void:
+func _on_enemy_defeated(
+	reward: int,
+	world_position: Vector2,
+	was_boss: bool = false
+) -> void:
 	active_enemy_count = maxi(0, active_enemy_count - 1)
 	if not game_over:
+		enemies_defeated += 1
+		if was_boss:
+			bosses_defeated += 1
+			achievement_manager.record_event(&"boss_defeated")
 		economy.add_gold(reward)
 		_spawn_floating_gold(world_position, reward)
 
@@ -409,6 +441,10 @@ func _on_tower_built(
 	add_child(build_effect)
 	build_effect.position = world_position
 	build_effect.setup_build_dust()
+	towers_built_count += 1
+	var tower_id: StringName = built_tower.tower_data.id
+	tower_type_build_counts[tower_id] = int(tower_type_build_counts.get(tower_id, 0)) + 1
+	achievement_manager.record_event(&"tower_built")
 	if (
 		tutorial_active
 		and tutorial_step == 1
@@ -422,12 +458,19 @@ func _on_tower_selection_opened(_index: int) -> void:
 		_set_tutorial_step(1)
 
 
-func _on_tower_upgraded(_tower: ShooterUnit) -> void:
+func _on_tower_upgraded(upgraded_tower: ShooterUnit) -> void:
+	upgrades_count += 1
+	achievement_manager.record_event(
+		&"tower_upgraded",
+		1,
+		{"level": upgraded_tower.level}
+	)
 	if tutorial_active and tutorial_step == 2:
 		_set_tutorial_step(3)
 
 
 func _on_tower_sold(world_position: Vector2, _refund: int) -> void:
+	towers_sold_count += 1
 	var sell_effect := VisualEffectScript.new()
 	add_child(sell_effect)
 	sell_effect.global_position = world_position
@@ -436,7 +479,7 @@ func _on_tower_sold(world_position: Vector2, _refund: int) -> void:
 
 func _open_reward_if_due() -> bool:
 	if (
-		wave not in RunModifierManager.REWARD_WAVES
+		not run_modifier_manager.is_reward_wave(wave, endless_mode)
 		or game_over
 		or victory_shown
 		or reward_pending
@@ -502,6 +545,8 @@ func _use_arrow_rain() -> bool:
 		hit_count += 1
 	if hit_count == 0:
 		return false
+	arrow_rain_uses += 1
+	achievement_manager.record_event(&"arrow_rain_hit", hit_count)
 	ability_cooldown = _get_ability_cooldown_duration()
 	ui_controller.update_ability_cooldown(ability_cooldown)
 	ui_controller.set_message("Ok Yağmuru!")
@@ -522,6 +567,7 @@ func _on_bomb_explosion(world_position: Vector2, hit_count: int) -> void:
 	add_child(explosion_effect)
 	explosion_effect.global_position = world_position
 	explosion_effect.setup_status_flash(Color("f2a15d"))
+	achievement_manager.record_event(&"bomb_multi_hit", hit_count)
 	if (
 		hit_count <= 0
 		or not bool(save_manager.screen_shake_enabled)
@@ -546,6 +592,8 @@ func _finish_game() -> void:
 	ui_controller.set_message("Savunma Düştü")
 	_close_tower_panel()
 	_stop_combat()
+	if endless_mode:
+		save_manager.update_endless_high_wave(wave)
 	ui_controller.show_game_over(wave, economy.total_gold_earned)
 
 
@@ -564,6 +612,14 @@ func _finish_victory() -> void:
 	elif health_percent >= level_data.star_thresholds[1]:
 		stars = 2
 	save_manager.complete_level(level_data.id, stars)
+	achievement_manager.record_event(
+		&"level_completed",
+		1,
+		{
+			"level_id": level_data.id,
+			"perfect": base.health == base.max_health
+		}
+	)
 	ui_controller.show_victory(
 		level_data.display_name,
 		stars,
@@ -628,9 +684,39 @@ func _prepare_restart() -> void:
 	ui_controller.update_ability_cooldown(0.0)
 	wave_manager.reset()
 	run_modifier_manager.reset()
+	enemies_defeated = 0
+	bosses_defeated = 0
+	towers_built_count = 0
+	upgrades_count = 0
+	towers_sold_count = 0
+	arrow_rain_uses = 0
+	tower_type_build_counts.clear()
 	economy.setup(level_data.starting_gold)
+	base.max_health = level_data.base_health
 	base.reset()
 	queue_redraw()
+
+
+func get_run_summary() -> Dictionary:
+	var favorite_tower: StringName = &"none"
+	var favorite_count: int = 0
+	for tower_id in tower_type_build_counts:
+		var count: int = tower_type_build_counts[tower_id]
+		if count > favorite_count:
+			favorite_tower = tower_id
+			favorite_count = count
+	return {
+		"wave": wave,
+		"enemies_defeated": enemies_defeated,
+		"bosses_defeated": bosses_defeated,
+		"gold_earned": economy.total_gold_earned,
+		"towers_built": towers_built_count,
+		"upgrades": upgrades_count,
+		"towers_sold": towers_sold_count,
+		"arrow_rain_uses": arrow_rain_uses,
+		"favorite_tower": favorite_tower,
+		"endless": endless_mode
+	}
 
 func _stop_combat() -> void:
 	tower_build_manager.input_enabled = false

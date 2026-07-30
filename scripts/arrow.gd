@@ -100,6 +100,10 @@ func _apply_area_damage(center: Vector2) -> void:
 		)
 
 func _draw() -> void:
+	var cosmetic_manager: Node = get_node_or_null("/root/CosmeticManager")
+	var arrow_color: Color = Color("8fd4e5") if is_heavy else Color("dedede")
+	if cosmetic_manager != null:
+		arrow_color = cosmetic_manager.get_selected_color(&"arrow_trail", arrow_color)
 	var shaft_width: float = 7.0 if is_heavy else 4.0
 	var shaft_color: Color = Color("344a61") if is_heavy else Color("5b3716")
 	draw_line(Vector2(-18.0, 0.0), Vector2(12.0, 0.0), shaft_color, shaft_width)
@@ -110,5 +114,5 @@ func _draw() -> void:
 	])
 	draw_colored_polygon(
 		arrow_head,
-		Color("8fd4e5") if is_heavy else Color("dedede")
+		arrow_color
 	)

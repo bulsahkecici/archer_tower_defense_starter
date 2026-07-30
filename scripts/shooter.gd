@@ -400,8 +400,17 @@ func _draw_static_visual(canvas: Node2D) -> void:
 		Vector2(-42.0, 28.0), Vector2(-42.0, -10.0)
 	]), Color("88958d"))
 	canvas.draw_circle(Vector2.ZERO, 28.0, Color("596b63"))
+	var cosmetic_manager: Node = get_node_or_null("/root/CosmeticManager")
+	var cosmetic_accent: Color = tower_data.accent
+	if cosmetic_manager != null:
+		cosmetic_accent = cosmetic_manager.get_selected_color(
+			&"tower_accent",
+			tower_data.accent
+		)
+	if cosmetic_accent != tower_data.accent:
+		canvas.draw_arc(Vector2.ZERO, 31.0, 0.0, TAU, 28, cosmetic_accent, 4.0)
 	if level >= 2:
-		canvas.draw_arc(Vector2.ZERO, 34.0, 0.0, TAU, 28, tower_data.accent.lightened(0.18), 5.0)
+		canvas.draw_arc(Vector2.ZERO, 34.0, 0.0, TAU, 28, cosmetic_accent.lightened(0.18), 5.0)
 	if level >= 3:
 		canvas.draw_circle(Vector2(0.0, 35.0), 7.0, Color("f5c85b"))
 

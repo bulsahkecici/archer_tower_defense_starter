@@ -24,6 +24,8 @@ boot_splash/use_filter=true
 
 SaveManager="*res://scripts/save_manager.gd"
 AudioManager="*res://scripts/audio_manager.gd"
+AchievementManager="*res://scripts/achievement_manager.gd"
+CosmeticManager="*res://scripts/cosmetic_manager.gd"
 
 [display]
 

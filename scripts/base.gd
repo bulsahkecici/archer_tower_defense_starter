@@ -15,6 +15,10 @@ func reset() -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	var cosmetic_manager: Node = get_node_or_null("/root/CosmeticManager")
+	var roof_color: Color = Color("347c86")
+	if cosmetic_manager != null:
+		roof_color = cosmetic_manager.get_selected_color(&"castle_roof", roof_color)
 	# Castle/base
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.35, 1.35))
 	draw_circle(Vector2(0.0, 35.0), 82.0, Color(0.08, 0.12, 0.13, 0.28))
@@ -23,10 +27,10 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(46.0, -66.0), Vector2(42.0, 45.0)), Color("53636e"))
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(-96.0, -66.0), Vector2(-67.0, -94.0), Vector2(-38.0, -66.0)
-	]), Color("347c86"))
+	]), roof_color)
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(38.0, -66.0), Vector2(67.0, -94.0), Vector2(96.0, -66.0)
-	]), Color("347c86"))
+	]), roof_color)
 	draw_rect(Rect2(Vector2(-18.0, 0.0), Vector2(36.0, 45.0)), Color("3d2b1f"))
 
 	var bar_width := 150.0
