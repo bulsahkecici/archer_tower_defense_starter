@@ -9,6 +9,8 @@ var save_manager: Node
 
 
 func _ready() -> void:
+	Engine.time_scale = 1.0
+	get_tree().paused = false
 	save_manager = get_node("/root/SaveManager")
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build_ui()

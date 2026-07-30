@@ -2,11 +2,15 @@ extends Node2D
 class_name TowerBuildManager
 
 signal tower_built(tower: ShooterUnit, tower_name: String, world_position: Vector2)
+signal tower_upgraded(tower: ShooterUnit)
+signal tower_sold(world_position: Vector2, refund: int)
+signal selection_opened(index: int)
 signal message_requested(text: String)
 
 const ShooterScript = preload("res://scripts/shooter.gd")
 const PanelScript = preload("res://scripts/tower_selection_panel.gd")
 const UpgradePanelScript = preload("res://scripts/tower_upgrade_panel.gd")
+const RangeIndicatorScript = preload("res://scripts/range_indicator.gd")
 const BUILD_SPOT_COSTS: Array[int] = [15, 20, 25, 30]
 
 var build_spots: Array[Vector2] = [
@@ -31,6 +35,7 @@ var hovered_build_spot: int = -1
 var pressed_build_spot: int = -1
 var press_time: float = 0.0
 var input_enabled: bool = true
+var range_indicator: TowerRangeIndicator
 
 
 func configure_level(positions: Array[Vector2], costs: Array[int]) -> bool:
@@ -61,6 +66,11 @@ func setup(
 	world_parent = tower_parent
 	projectile_parent = projectile_container
 	z_index = 4
+	range_indicator = RangeIndicatorScript.new()
+	range_indicator.name = "TowerRangeIndicator"
+	range_indicator.z_index = 2
+	world_parent.add_child(range_indicator)
+	range_indicator.clear()
 	if not economy.gold_changed.is_connected(_on_gold_changed):
 		economy.gold_changed.connect(_on_gold_changed)
 	queue_redraw()
@@ -139,7 +149,10 @@ func open_tower_selection(index: int) -> bool:
 	interface_layer.add_child(tower_selection_panel)
 	tower_selection_panel.setup(build_spot_costs[index], economy)
 	tower_selection_panel.tower_selected.connect(_on_tower_selected)
+	tower_selection_panel.tower_previewed.connect(preview_selected_tower)
 	tower_selection_panel.closed.connect(_on_panel_closed)
+	preview_selected_tower(ShooterUnit.TowerType.ARCHER)
+	selection_opened.emit(index)
 	message_requested.emit("Kule türünü seç")
 	return true
 
@@ -178,6 +191,23 @@ func _on_tower_selected(tower_type: ShooterUnit.TowerType) -> void:
 	select_tower(tower_type)
 
 
+func preview_selected_tower(tower_type: ShooterUnit.TowerType) -> void:
+	if selected_build_spot < 0 or selected_build_spot >= build_spots.size():
+		return
+	if not is_instance_valid(range_indicator):
+		return
+	var data: TowerData = (
+		tower_selection_panel.get_tower_data(tower_type)
+		if is_instance_valid(tower_selection_panel)
+		else TowerData.create_for_id(_tower_id_for_type(tower_type))
+	)
+	range_indicator.show_range(
+		build_spots[selected_build_spot],
+		data.get_attack_range(1),
+		data.accent
+	)
+
+
 func open_tower_upgrade(index: int) -> bool:
 	if index < 0 or index >= build_spots.size() or not built_spots[index]:
 		return false
@@ -193,6 +223,7 @@ func open_tower_upgrade(index: int) -> bool:
 	tower_upgrade_panel.upgrade_requested.connect(_upgrade_selected_tower)
 	tower_upgrade_panel.sell_requested.connect(_sell_selected_tower)
 	tower_upgrade_panel.closed.connect(_on_upgrade_panel_closed)
+	_show_tower_range(tower)
 	return true
 
 
@@ -212,8 +243,10 @@ func _upgrade_selected_tower() -> bool:
 	if spent:
 		tower.invested_gold += cost
 		tower.upgrade()
+		_show_tower_range(tower)
 		message_requested.emit("%s seviye %d oldu!" % [tower.tower_data.display_name, tower.level])
 		tower_upgrade_panel.refresh()
+		tower_upgraded.emit(tower)
 	transaction_locked = false
 	return spent
 
@@ -230,6 +263,7 @@ func _sell_selected_tower() -> bool:
 		return false
 	transaction_locked = true
 	var refund: int = tower.get_sell_refund()
+	var sold_position: Vector2 = tower.global_position
 	tower.stop_combat()
 	towers.erase(tower)
 	towers_by_spot[index] = null
@@ -241,6 +275,7 @@ func _sell_selected_tower() -> bool:
 	transaction_locked = false
 	queue_redraw()
 	message_requested.emit("Kule satıldı: +%d altın" % refund)
+	tower_sold.emit(sold_position, refund)
 	return true
 
 
@@ -252,16 +287,19 @@ func close_panel() -> void:
 		tower_upgrade_panel.queue_free()
 	tower_upgrade_panel = null
 	selected_build_spot = -1
+	clear_range_indicator()
 
 
 func _on_panel_closed() -> void:
 	tower_selection_panel = null
 	selected_build_spot = -1
+	clear_range_indicator()
 
 
 func _on_upgrade_panel_closed() -> void:
 	tower_upgrade_panel = null
 	selected_build_spot = -1
+	clear_range_indicator()
 
 
 func reset() -> void:
@@ -278,7 +316,37 @@ func reset() -> void:
 	pressed_build_spot = -1
 	press_time = 0.0
 	input_enabled = true
+	clear_range_indicator()
 	queue_redraw()
+
+
+func clear_range_indicator() -> void:
+	if is_instance_valid(range_indicator):
+		range_indicator.clear()
+
+
+func _show_tower_range(tower: ShooterUnit) -> void:
+	if not is_instance_valid(range_indicator) or not is_instance_valid(tower):
+		return
+	var next_range: float = 0.0
+	if tower.can_upgrade():
+		next_range = tower.tower_data.get_attack_range(tower.level + 1)
+	range_indicator.show_range(
+		tower.global_position,
+		tower.attack_range,
+		tower.tower_data.accent,
+		next_range
+	)
+
+
+func _tower_id_for_type(tower_type: ShooterUnit.TowerType) -> StringName:
+	if tower_type == ShooterUnit.TowerType.CROSSBOW:
+		return TowerData.CROSSBOW_ID
+	if tower_type == ShooterUnit.TowerType.ICE:
+		return TowerData.ICE_ID
+	if tower_type == ShooterUnit.TowerType.BOMB:
+		return TowerData.BOMB_ID
+	return TowerData.ARCHER_ID
 
 
 func _on_gold_changed(_gold: int) -> void:

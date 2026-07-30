@@ -114,7 +114,19 @@ func upgrade() -> bool:
 		return false
 	level += 1
 	apply_level_stats()
+	play_upgrade_feedback()
 	return true
+
+
+func play_upgrade_feedback() -> void:
+	if fire_tween != null and fire_tween.is_valid():
+		fire_tween.kill()
+	modulate = tower_data.accent.lightened(0.35) if tower_data != null else Color("ffe08a")
+	scale = Vector2(1.08, 1.08)
+	fire_tween = create_tween()
+	fire_tween.set_parallel(true)
+	fire_tween.tween_property(self, "modulate", Color.WHITE, 0.28)
+	fire_tween.tween_property(self, "scale", Vector2.ONE, 0.28)
 
 
 func get_sell_refund() -> int:
@@ -200,11 +212,21 @@ func _shoot(target: Node2D) -> void:
 		and tower_data != null
 		and tower_data.is_heavy_projectile
 	)
+	var critical_hit: bool = (
+		not is_archer
+		and tower_data != null
+		and tower_data.critical_chance > 0.0
+		and randf() < tower_data.critical_chance
+	)
+	var projectile_damage: float = (
+		damage * tower_data.critical_multiplier if critical_hit else damage
+	)
 	arrow.setup(
-		target, damage, arrow_speed, heavy_projectile,
+		target, projectile_damage, arrow_speed, heavy_projectile,
 		tower_data.slow_ratio if tower_data != null else 0.0,
 		tower_data.slow_duration if tower_data != null else 0.0,
-		tower_data.explosion_radius if tower_data != null else 0.0
+		tower_data.explosion_radius if tower_data != null else 0.0,
+		critical_hit
 	)
 	last_projectile = arrow
 

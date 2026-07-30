@@ -9,6 +9,8 @@ var sfx_volume: float = 0.9
 var vibration_enabled: bool = true
 var first_launch: bool = true
 var last_level: int = 1
+var tutorial_completed: bool = false
+var screen_shake_enabled: bool = true
 
 
 func _ready() -> void:
@@ -75,7 +77,9 @@ func to_dictionary() -> Dictionary:
 		"sfx_volume": sfx_volume,
 		"vibration_enabled": vibration_enabled,
 		"first_launch": first_launch,
-		"last_level": last_level
+		"last_level": last_level,
+		"tutorial_completed": tutorial_completed,
+		"screen_shake_enabled": screen_shake_enabled
 	}
 
 
@@ -87,6 +91,8 @@ func _apply_dictionary(data: Dictionary) -> void:
 	vibration_enabled = bool(data.get("vibration_enabled", true))
 	first_launch = bool(data.get("first_launch", false))
 	last_level = clampi(int(data.get("last_level", 1)), 1, unlocked_level)
+	tutorial_completed = bool(data.get("tutorial_completed", not first_launch))
+	screen_shake_enabled = bool(data.get("screen_shake_enabled", true))
 
 
 func reset_defaults() -> void:
@@ -97,6 +103,8 @@ func reset_defaults() -> void:
 	vibration_enabled = true
 	first_launch = true
 	last_level = 1
+	tutorial_completed = false
+	screen_shake_enabled = true
 
 
 func is_level_unlocked(level_id: int) -> bool:
@@ -123,3 +131,11 @@ func get_total_stars() -> int:
 	for value in level_stars.values():
 		total += clampi(int(value), 0, 3)
 	return total
+
+
+func complete_tutorial() -> void:
+	if tutorial_completed:
+		return
+	tutorial_completed = true
+	first_launch = false
+	save_data()

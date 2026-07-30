@@ -15,6 +15,7 @@ func _run() -> void:
 	audio_manager = root.get_node("AudioManager")
 	save_manager.set_save_path(temp_save_path)
 	save_manager.reset_defaults()
+	save_manager.tutorial_completed = true
 	save_manager.save_data()
 	await _test_scenes_and_levels()
 	_test_save_manager()

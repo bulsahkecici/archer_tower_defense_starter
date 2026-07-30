@@ -6,6 +6,12 @@ signal ability_requested
 signal pause_requested
 signal resume_requested
 signal next_level_requested
+signal speed_requested(speed: float)
+signal wave_preview_ready
+signal tutorial_skipped
+
+const WavePreviewPanelScript = preload("res://scripts/wave_preview_panel.gd")
+const TutorialOverlayScript = preload("res://scripts/tutorial_overlay.gd")
 
 var interface_layer: CanvasLayer
 var gold_label: Label
@@ -23,6 +29,18 @@ var ability_button: Button
 var pause_button: Button
 var pause_layer: CanvasLayer
 var victory_layer: CanvasLayer
+var speed_button: Button
+var selected_speed: float = 1.0
+var wave_preview_layer: CanvasLayer
+var wave_preview_panel: WavePreviewPanel
+var tutorial_layer: CanvasLayer
+var tutorial_overlay: FirstLevelTutorialOverlay
+var boss_bar_container: PanelContainer
+var boss_name_label: Label
+var boss_health_label: Label
+var boss_progress: ProgressBar
+var tracked_bosses: Array[Node] = []
+var ability_cooldown_duration: float = 25.0
 
 
 func setup() -> void:
@@ -31,6 +49,10 @@ func setup() -> void:
 	interface_layer.layer = 10
 	add_child(interface_layer)
 	_build_hud()
+
+
+func _process(_delta: float) -> void:
+	_update_boss_bar()
 
 
 func _build_hud() -> void:
@@ -111,6 +133,54 @@ func _build_hud() -> void:
 	pause_button.pressed.connect(func() -> void: pause_requested.emit())
 	safe_ui.add_child(pause_button)
 
+	speed_button = Button.new()
+	speed_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	speed_button.position = Vector2(-290.0 - margins.z, margins.y)
+	speed_button.size = Vector2(120.0, 82.0)
+	speed_button.text = "1×"
+	speed_button.add_theme_font_size_override("font_size", 28)
+	speed_button.pressed.connect(_toggle_speed)
+	safe_ui.add_child(speed_button)
+	_build_boss_bar(safe_ui, margins)
+
+
+func _build_boss_bar(parent: Control, margins: Vector4) -> void:
+	boss_bar_container = PanelContainer.new()
+	boss_bar_container.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	boss_bar_container.offset_left = margins.x + 160.0
+	boss_bar_container.offset_top = margins.y + 104.0
+	boss_bar_container.offset_right = -margins.z - 160.0
+	boss_bar_container.offset_bottom = margins.y + 224.0
+	boss_bar_container.visible = false
+	boss_bar_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.10, 0.05, 0.13, 0.92)
+	style.border_color = Color("d2b45f")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(22)
+	style.content_margin_left = 22.0
+	style.content_margin_right = 22.0
+	style.content_margin_top = 12.0
+	style.content_margin_bottom = 12.0
+	boss_bar_container.add_theme_stylebox_override("panel", style)
+	parent.add_child(boss_bar_container)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 4)
+	boss_bar_container.add_child(content)
+	boss_name_label = Label.new()
+	boss_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_name_label.add_theme_font_size_override("font_size", 25)
+	content.add_child(boss_name_label)
+	boss_progress = ProgressBar.new()
+	boss_progress.custom_minimum_size = Vector2(0.0, 24.0)
+	boss_progress.show_percentage = false
+	boss_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(boss_progress)
+	boss_health_label = Label.new()
+	boss_health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_health_label.add_theme_font_size_override("font_size", 19)
+	content.add_child(boss_health_label)
+
 
 func _create_hud_pill(parent: Control, accent: Color) -> Label:
 	var panel := PanelContainer.new()
@@ -149,8 +219,16 @@ func update_gold(current_gold: int, animate: bool = true) -> void:
 	gold_tween.tween_property(gold_label, "scale", Vector2.ONE, 0.12)
 
 
-func update_status(wave: int, health: int, active_enemies: int = -1) -> void:
-	wave_label.text = "DALGA  %d" % wave
+func update_status(
+	wave: int,
+	health: int,
+	active_enemies: int = -1,
+	total_waves: int = 0
+) -> void:
+	wave_label.text = (
+		"%d / %d" % [wave, total_waves]
+		if total_waves > 0 else "DALGA %d" % wave
+	)
 	base_label.text = "◆  %d" % health
 	if active_enemies >= 0:
 		help_label.text = "Aktif düşman: %d  •  Kule kurmak için platforma dokun" % active_enemies
@@ -167,9 +245,116 @@ func update_ability_cooldown(remaining: float) -> void:
 		return
 	ability_button.disabled = remaining > 0.0
 	ability_button.text = (
-		"OK YAĞMURU  %.0f" % ceil(remaining)
-		if remaining > 0.0 else "OK YAĞMURU"
+		"OK YAĞMURU\n%d sn" % int(ceil(remaining))
+		if remaining > 0.0 else "OK YAĞMURU\nHAZIR"
 	)
+	ability_button.modulate = Color.WHITE if remaining > 0.0 else Color("fff1a8")
+
+
+func set_ability_cooldown_duration(duration: float) -> void:
+	ability_cooldown_duration = maxf(0.0, duration)
+
+
+func _toggle_speed() -> void:
+	var next_speed: float = 2.0 if is_equal_approx(selected_speed, 1.0) else 1.0
+	set_speed(next_speed)
+	speed_requested.emit(selected_speed)
+
+
+func set_speed(speed: float) -> void:
+	selected_speed = 2.0 if speed >= 1.5 else 1.0
+	if is_instance_valid(speed_button):
+		speed_button.text = "%d×" % int(selected_speed)
+
+
+func show_wave_preview(summary: Dictionary, total: int) -> WavePreviewPanel:
+	if is_instance_valid(wave_preview_panel):
+		return wave_preview_panel
+	wave_preview_layer = CanvasLayer.new()
+	wave_preview_layer.layer = 24
+	add_child(wave_preview_layer)
+	wave_preview_panel = WavePreviewPanelScript.new()
+	wave_preview_layer.add_child(wave_preview_panel)
+	wave_preview_panel.setup(summary, total)
+	wave_preview_panel.ready_pressed.connect(_on_wave_preview_ready)
+	return wave_preview_panel
+
+
+func _on_wave_preview_ready() -> void:
+	if not is_instance_valid(wave_preview_panel):
+		return
+	wave_preview_panel.queue_free()
+	wave_preview_panel = null
+	if is_instance_valid(wave_preview_layer):
+		wave_preview_layer.queue_free()
+	wave_preview_layer = null
+	wave_preview_ready.emit()
+
+
+func confirm_wave_preview_for_test() -> void:
+	if is_instance_valid(wave_preview_panel):
+		wave_preview_panel._confirm_ready()
+
+
+func show_tutorial(step: int = 0) -> FirstLevelTutorialOverlay:
+	if not is_instance_valid(tutorial_overlay):
+		tutorial_layer = CanvasLayer.new()
+		tutorial_layer.layer = 25
+		add_child(tutorial_layer)
+		tutorial_overlay = TutorialOverlayScript.new()
+		tutorial_layer.add_child(tutorial_overlay)
+		tutorial_overlay.setup()
+		tutorial_overlay.skip_requested.connect(
+			func() -> void: tutorial_skipped.emit()
+		)
+	tutorial_overlay.show_step(step)
+	return tutorial_overlay
+
+
+func hide_tutorial() -> void:
+	if is_instance_valid(tutorial_layer):
+		tutorial_layer.queue_free()
+	tutorial_layer = null
+	tutorial_overlay = null
+
+
+func register_boss(enemy: Node) -> void:
+	if not is_instance_valid(enemy) or enemy in tracked_bosses:
+		return
+	tracked_bosses.append(enemy)
+	_update_boss_bar()
+
+
+func unregister_boss(enemy: Node) -> void:
+	tracked_bosses.erase(enemy)
+	_update_boss_bar()
+
+
+func _update_boss_bar() -> void:
+	tracked_bosses = tracked_bosses.filter(
+		func(enemy: Node) -> bool:
+			return (
+				is_instance_valid(enemy)
+				and not enemy.is_queued_for_deletion()
+				and enemy.get("has_resolved") != true
+			)
+	)
+	if tracked_bosses.is_empty():
+		if is_instance_valid(boss_bar_container):
+			boss_bar_container.visible = false
+		return
+	var boss: Node = tracked_bosses[0]
+	var health: float = maxf(0.0, float(boss.get("health")))
+	var maximum: float = maxf(1.0, float(boss.get("max_health")))
+	boss_bar_container.visible = true
+	boss_name_label.text = "BOSS — %s" % String(boss.get("display_name"))
+	boss_progress.max_value = maximum
+	boss_progress.value = health
+	boss_health_label.text = "%.0f / %.0f  •  %d%%" % [
+		health,
+		maximum,
+		int(round(health / maximum * 100.0))
+	]
 
 
 func play_base_feedback() -> void:
@@ -314,6 +499,7 @@ func show_victory(
 
 func _change_scene_unpaused(scene_path: String) -> void:
 	get_tree().paused = false
+	Engine.time_scale = 1.0
 	get_tree().change_scene_to_file(scene_path)
 
 
@@ -366,3 +552,12 @@ func reset() -> void:
 	if is_instance_valid(victory_layer):
 		victory_layer.queue_free()
 	victory_layer = null
+	if is_instance_valid(wave_preview_layer):
+		wave_preview_layer.queue_free()
+	wave_preview_layer = null
+	wave_preview_panel = null
+	hide_tutorial()
+	tracked_bosses.clear()
+	if is_instance_valid(boss_bar_container):
+		boss_bar_container.visible = false
+	set_speed(1.0)

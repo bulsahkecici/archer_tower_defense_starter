@@ -8,10 +8,16 @@ func _init() -> void:
 
 
 func _run() -> void:
+	var save_manager: Node = root.get_node("SaveManager")
+	save_manager.set_save_path("/private/tmp/archer_stage3_save.json")
+	save_manager.reset_defaults()
+	save_manager.tutorial_completed = true
 	var scene_resource: PackedScene = load("res://main.tscn")
 	var game: Node = scene_resource.instantiate()
 	root.add_child(game)
 	await process_frame
+	await process_frame
+	game.confirm_wave_preview_for_test()
 	await process_frame
 
 	_expect(game.build_spots.size() == 4, "Dört inşa noktası bulunmalı")

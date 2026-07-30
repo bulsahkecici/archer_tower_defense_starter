@@ -124,6 +124,20 @@ func get_wave_composition(wave_number: int) -> Array[StringName]:
 	return composition
 
 
+func get_wave_summary(wave_number: int) -> Dictionary:
+	var composition: Array[StringName] = get_wave_composition(wave_number)
+	return {
+		"wave": maxi(1, wave_number),
+		"normal": composition.count(NORMAL_ID),
+		"fast": composition.count(FAST_ID),
+		"armored": composition.count(ARMORED_ID),
+		"swarm": composition.count(SWARM_ID),
+		"boss": composition.count(BOSS_ID),
+		"has_boss": BOSS_ID in composition,
+		"total": composition.size()
+	}
+
+
 func get_health_multiplier(wave_number: int) -> float:
 	var safe_wave: int = maxi(1, wave_number)
 	if safe_wave <= 10:

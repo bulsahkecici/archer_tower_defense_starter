@@ -8,6 +8,7 @@ func _init() -> void:
 
 
 func _run() -> void:
+	_use_clean_level_one_save("stage6")
 	var game: Node = await _create_game()
 	game.set_process(false)
 	game.archer.stop_combat()
@@ -128,10 +129,19 @@ func _run() -> void:
 	quit(failures)
 
 
+func _use_clean_level_one_save(test_name: String) -> void:
+	var save_manager: Node = root.get_node("SaveManager")
+	save_manager.set_save_path("/private/tmp/archer_%s_save.json" % test_name)
+	save_manager.reset_defaults()
+	save_manager.tutorial_completed = true
+
+
 func _create_game() -> Node:
 	var game: Node = load("res://main.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
+	await process_frame
+	game.confirm_wave_preview_for_test()
 	await process_frame
 	return game
 

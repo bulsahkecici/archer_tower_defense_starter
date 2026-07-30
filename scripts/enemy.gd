@@ -3,6 +3,13 @@ class_name PathEnemy
 
 signal defeated(reward: int, world_position: Vector2)
 signal reached_base(damage: int)
+signal damage_received(
+	amount: float,
+	world_position: Vector2,
+	critical: bool,
+	armor_blocked: bool
+)
+signal slow_applied(world_position: Vector2)
 
 var max_health: float = 10.0
 var health: float = 10.0
@@ -59,6 +66,7 @@ func _process(delta: float) -> void:
 		slow_remaining -= delta
 		if slow_remaining <= 0.0:
 			slow_ratio = 0.0
+			queue_redraw()
 	speed = base_speed * (1.0 - slow_ratio)
 	var previous_position: Vector2 = global_position
 	progress += speed * delta
@@ -70,15 +78,19 @@ func _process(delta: float) -> void:
 	if progress_ratio >= 0.999:
 		resolve_at_base()
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, critical: bool = false) -> float:
 	if has_resolved:
-		return
-	health -= maxf(0.0, amount) * (1.0 - armor_ratio)
+		return 0.0
+	var requested_damage: float = maxf(0.0, amount)
+	var applied_damage: float = requested_damage * (1.0 - armor_ratio)
+	health -= applied_damage
+	damage_received.emit(applied_damage, global_position, critical, armor_ratio > 0.0)
 	if health <= 0.0:
 		resolve_defeated()
 	else:
 		_play_damage_feedback()
 		queue_redraw()
+	return applied_damage
 
 
 func apply_slow(requested_ratio: float, duration: float) -> void:
@@ -88,6 +100,8 @@ func apply_slow(requested_ratio: float, duration: float) -> void:
 	slow_ratio = maxf(slow_ratio, effective_ratio)
 	slow_remaining = maxf(slow_remaining, duration)
 	speed = base_speed * (1.0 - slow_ratio)
+	slow_applied.emit(global_position)
+	queue_redraw()
 
 func resolve_defeated() -> bool:
 	if has_resolved:
@@ -181,3 +195,64 @@ func _draw() -> void:
 	var bar_rect := Rect2(Vector2(-bar_width / 2.0, -body_radius - 14.0), Vector2(bar_width, 7.0))
 	draw_rect(bar_rect, Color("402b2d"))
 	draw_rect(Rect2(bar_rect.position, Vector2(bar_width * ratio, 7.0)), Color("65d46e"))
+	_draw_status_icons(bar_rect.position + Vector2(0.0, -12.0))
+
+
+func has_status_icon(status: StringName) -> bool:
+	if status == &"armor":
+		return armor_ratio > 0.0
+	if status == &"slow":
+		return slow_remaining > 0.0 and slow_ratio > 0.0
+	if status == &"boss":
+		return is_boss
+	return false
+
+
+func _draw_status_icons(origin: Vector2) -> void:
+	var icon_x: float = origin.x
+	if has_status_icon(&"armor"):
+		var shield := PackedVector2Array([
+			Vector2(icon_x, origin.y - 9.0),
+			Vector2(icon_x + 8.0, origin.y - 5.0),
+			Vector2(icon_x + 6.0, origin.y + 7.0),
+			Vector2(icon_x, origin.y + 12.0),
+			Vector2(icon_x - 6.0, origin.y + 7.0),
+			Vector2(icon_x - 8.0, origin.y - 5.0)
+		])
+		draw_colored_polygon(shield, Color("a9c1cf"))
+		icon_x += 22.0
+	if has_status_icon(&"slow"):
+		var slow_color := Color("9cecff")
+		draw_line(
+			Vector2(icon_x - 8.0, origin.y),
+			Vector2(icon_x + 8.0, origin.y),
+			slow_color,
+			2.5
+		)
+		draw_line(
+			Vector2(icon_x, origin.y - 8.0),
+			Vector2(icon_x, origin.y + 8.0),
+			slow_color,
+			2.5
+		)
+		draw_line(
+			Vector2(icon_x - 6.0, origin.y - 6.0),
+			Vector2(icon_x + 6.0, origin.y + 6.0),
+			slow_color,
+			2.5
+		)
+		draw_line(
+			Vector2(icon_x + 6.0, origin.y - 6.0),
+			Vector2(icon_x - 6.0, origin.y + 6.0),
+			slow_color,
+			2.5
+		)
+		icon_x += 22.0
+	if has_status_icon(&"boss"):
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(icon_x - 10.0, origin.y + 7.0),
+			Vector2(icon_x - 8.0, origin.y - 7.0),
+			Vector2(icon_x, origin.y),
+			Vector2(icon_x + 8.0, origin.y - 7.0),
+			Vector2(icon_x + 10.0, origin.y + 7.0)
+		]), Color("ffd667"))

@@ -11,6 +11,7 @@ func _init() -> void:
 
 
 func _run() -> void:
+	_use_clean_level_one_save("stage5")
 	var game: Node = await _create_game()
 	game.set_process(false)
 	game.archer.stop_combat()
@@ -35,6 +36,13 @@ func _run() -> void:
 	else:
 		push_error("STAGE5_TEST_FAIL: %d hata" % failures)
 	quit(failures)
+
+
+func _use_clean_level_one_save(test_name: String) -> void:
+	var save_manager: Node = root.get_node("SaveManager")
+	save_manager.set_save_path("/private/tmp/archer_%s_save.json" % test_name)
+	save_manager.reset_defaults()
+	save_manager.tutorial_completed = true
 
 
 func _create_game() -> Node:

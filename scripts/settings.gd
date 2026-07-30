@@ -4,11 +4,13 @@ class_name SettingsMenu
 var music_slider: HSlider
 var sfx_slider: HSlider
 var vibration_toggle: CheckButton
+var screen_shake_toggle: CheckButton
 var save_manager: Node
 var audio_manager: Node
 
 
 func _ready() -> void:
+	Engine.time_scale = 1.0
 	save_manager = get_node("/root/SaveManager")
 	audio_manager = get_node("/root/AudioManager")
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -40,6 +42,11 @@ func _build_ui() -> void:
 	vibration_toggle.custom_minimum_size = Vector2(620.0, 90.0)
 	vibration_toggle.add_theme_font_size_override("font_size", 30)
 	content.add_child(vibration_toggle)
+	screen_shake_toggle = CheckButton.new()
+	screen_shake_toggle.text = "Ekran Sarsıntısı"
+	screen_shake_toggle.custom_minimum_size = Vector2(620.0, 90.0)
+	screen_shake_toggle.add_theme_font_size_override("font_size", 30)
+	content.add_child(screen_shake_toggle)
 	var back := Button.new()
 	back.text = "Geri"
 	back.custom_minimum_size = Vector2(620.0, 100.0)
@@ -47,6 +54,7 @@ func _build_ui() -> void:
 	music_slider.value_changed.connect(_on_music_changed)
 	sfx_slider.value_changed.connect(_on_sfx_changed)
 	vibration_toggle.toggled.connect(_on_vibration_toggled)
+	screen_shake_toggle.toggled.connect(_on_screen_shake_toggled)
 	back.pressed.connect(_go_back)
 
 
@@ -68,6 +76,7 @@ func _apply_saved_values() -> void:
 	music_slider.set_value_no_signal(save_manager.music_volume)
 	sfx_slider.set_value_no_signal(save_manager.sfx_volume)
 	vibration_toggle.set_pressed_no_signal(save_manager.vibration_enabled)
+	screen_shake_toggle.set_pressed_no_signal(save_manager.screen_shake_enabled)
 	audio_manager.set_music_volume(save_manager.music_volume)
 	audio_manager.set_sfx_volume(save_manager.sfx_volume)
 
@@ -86,6 +95,11 @@ func _on_sfx_changed(value: float) -> void:
 
 func _on_vibration_toggled(enabled: bool) -> void:
 	save_manager.vibration_enabled = enabled
+	save_manager.save_data()
+
+
+func _on_screen_shake_toggled(enabled: bool) -> void:
+	save_manager.screen_shake_enabled = enabled
 	save_manager.save_data()
 
 

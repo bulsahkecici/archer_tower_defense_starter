@@ -28,6 +28,12 @@ var level_data: LevelData
 var total_waves: int = 10
 var victory_shown: bool = false
 var save_manager: Node
+var wave_preview_pending: bool = false
+var selected_game_speed: float = 1.0
+var tutorial_active: bool = false
+var tutorial_step: int = 0
+var world_shake_tween: Tween
+var damage_number_spawn_count: int = 0
 
 var base: DefenseBase
 var archer: ShooterUnit
@@ -60,6 +66,8 @@ var boss_warning_tween: Tween:
 		return ui_controller.boss_warning_tween if is_instance_valid(ui_controller) else null
 
 func _ready() -> void:
+	Engine.time_scale = 1.0
+	add_to_group("gameplay_root")
 	save_manager = get_node("/root/SaveManager")
 	var catalog: Array[LevelData] = LevelData.create_catalog()
 	var selected_level: int = clampi(save_manager.last_level, 1, catalog.size())
@@ -75,8 +83,13 @@ func _ready() -> void:
 	_create_world()
 	_create_controllers()
 	_update_ui()
-	_start_next_wave()
+	if not _begin_tutorial_if_needed():
+		_queue_next_wave_preview()
 	queue_redraw()
+
+
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
 
 func _create_world() -> void:
 	enemy_path = GamePathScript.new()
@@ -115,6 +128,10 @@ func _create_controllers() -> void:
 	ui_controller.pause_requested.connect(_pause_game)
 	ui_controller.resume_requested.connect(_resume_game)
 	ui_controller.next_level_requested.connect(_next_level)
+	ui_controller.speed_requested.connect(_set_game_speed)
+	ui_controller.wave_preview_ready.connect(_begin_previewed_wave)
+	ui_controller.tutorial_skipped.connect(_complete_tutorial)
+	ui_controller.set_ability_cooldown_duration(ABILITY_COOLDOWN)
 
 	tower_build_manager = TowerBuildManagerScript.new()
 	add_child(tower_build_manager)
@@ -124,6 +141,9 @@ func _create_controllers() -> void:
 	)
 	tower_build_manager.setup(economy, ui_controller.interface_layer, self, projectiles)
 	tower_build_manager.tower_built.connect(_on_tower_built)
+	tower_build_manager.tower_upgraded.connect(_on_tower_upgraded)
+	tower_build_manager.tower_sold.connect(_on_tower_sold)
+	tower_build_manager.selection_opened.connect(_on_tower_selection_opened)
 	tower_build_manager.message_requested.connect(ui_controller.set_message)
 	build_spots = tower_build_manager.build_spots
 	built_spots = tower_build_manager.built_spots
@@ -173,12 +193,44 @@ func _process(delta: float) -> void:
 			intermission -= delta
 			if intermission <= 0.0:
 				wave_manager.set_waiting()
-				_start_next_wave()
+				_queue_next_wave_preview()
 
 func _start_next_wave() -> void:
-	if game_over or wave_manager.state != WaveManager.WaveState.WAITING:
+	if wave_preview_pending:
+		return
+	_queue_next_wave_preview()
+
+
+func _queue_next_wave_preview() -> void:
+	if (
+		game_over
+		or victory_shown
+		or tutorial_active
+		or wave_preview_pending
+		or wave_manager.state != WaveManager.WaveState.WAITING
+		or wave >= total_waves
+	):
 		return
 	wave += 1
+	wave_preview_pending = true
+	tower_build_manager.input_enabled = false
+	ui_controller.show_wave_preview(
+		wave_manager.get_wave_summary(wave),
+		total_waves
+	)
+	_update_ui()
+
+
+func _begin_previewed_wave() -> void:
+	if (
+		not wave_preview_pending
+		or game_over
+		or victory_shown
+		or get_tree().paused
+	):
+		return
+	wave_preview_pending = false
+	tower_build_manager.input_enabled = true
 	wave_manager.begin_wave(wave)
 	spawn_interval = maxf(0.30, 0.78 - float(wave - 1) * 0.018)
 	spawn_cooldown = 0.15
@@ -207,10 +259,57 @@ func _spawn_enemy(enemy_id: StringName) -> PathEnemy:
 			* lerpf(1.0, level_data.wave_difficulty_multiplier, 0.35),
 		wave_manager.get_reward_bonus(wave, enemy_data.is_boss)
 	)
-	enemy.defeated.connect(_on_enemy_defeated)
-	enemy.reached_base.connect(_on_enemy_reached_base)
+	enemy.damage_received.connect(_on_enemy_damage_received)
+	enemy.slow_applied.connect(_on_enemy_slow_applied)
+	enemy.defeated.connect(
+		func(reward: int, world_position: Vector2) -> void:
+			ui_controller.unregister_boss(enemy)
+			_on_enemy_defeated(reward, world_position)
+	)
+	enemy.reached_base.connect(
+		func(damage: int) -> void:
+			ui_controller.unregister_boss(enemy)
+			_on_enemy_reached_base(damage)
+	)
+	if enemy.is_boss:
+		ui_controller.register_boss(enemy)
 	active_enemy_count += 1
 	return enemy
+
+
+func _on_enemy_damage_received(
+	amount: float,
+	world_position: Vector2,
+	critical: bool,
+	armor_blocked: bool
+) -> void:
+	if amount <= 0.0:
+		return
+	var damage_effect := VisualEffectScript.new()
+	add_child(damage_effect)
+	damage_effect.global_position = world_position
+	damage_effect.setup_damage_number(amount, critical, armor_blocked)
+	damage_number_spawn_count += 1
+	var boss_hit: bool = false
+	for boss in ui_controller.tracked_bosses:
+		if (
+			is_instance_valid(boss)
+			and boss.global_position.distance_to(world_position) < 4.0
+		):
+			boss_hit = true
+			break
+	if boss_hit:
+		var boss_effect := VisualEffectScript.new()
+		add_child(boss_effect)
+		boss_effect.global_position = world_position
+		boss_effect.setup_status_flash(Color("c8a6ff"))
+
+
+func _on_enemy_slow_applied(world_position: Vector2) -> void:
+	var slow_effect := VisualEffectScript.new()
+	add_child(slow_effect)
+	slow_effect.global_position = world_position
+	slow_effect.setup_status_flash(Color("9cecff"))
 
 func _on_enemy_defeated(reward: int, world_position: Vector2) -> void:
 	active_enemy_count = maxi(0, active_enemy_count - 1)
@@ -229,7 +328,9 @@ func _on_enemy_reached_base(damage: int) -> void:
 		_finish_game()
 
 func _input(event: InputEvent) -> void:
-	if game_over:
+	if game_over or wave_preview_pending:
+		return
+	if tutorial_active and tutorial_step != 0 and tutorial_step != 2:
 		return
 	tower_build_manager.handle_input(event)
 
@@ -239,7 +340,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# viewport events are handled once in _input before passive UI can consume them.
 	if not event.is_pressed():
 		return
-	if game_over:
+	if game_over or wave_preview_pending:
 		return
 	tower_build_manager.handle_input(event)
 
@@ -253,7 +354,7 @@ func _on_tower_selected(tower_type: ShooterUnit.TowerType) -> void:
 	tower_build_manager.select_tower(tower_type)
 
 func _on_tower_built(
-	_tower: ShooterUnit,
+	built_tower: ShooterUnit,
 	tower_name: String,
 	world_position: Vector2
 ) -> void:
@@ -262,6 +363,29 @@ func _on_tower_built(
 	add_child(build_effect)
 	build_effect.position = world_position
 	build_effect.setup_build_dust()
+	if (
+		tutorial_active
+		and tutorial_step == 1
+		and built_tower.tower_type == ShooterUnit.TowerType.ARCHER
+	):
+		_set_tutorial_step(2)
+
+
+func _on_tower_selection_opened(_index: int) -> void:
+	if tutorial_active and tutorial_step == 0:
+		_set_tutorial_step(1)
+
+
+func _on_tower_upgraded(_tower: ShooterUnit) -> void:
+	if tutorial_active and tutorial_step == 2:
+		_set_tutorial_step(3)
+
+
+func _on_tower_sold(world_position: Vector2, _refund: int) -> void:
+	var sell_effect := VisualEffectScript.new()
+	add_child(sell_effect)
+	sell_effect.global_position = world_position
+	sell_effect.setup_sell_dust()
 
 func _spawn_floating_gold(world_position: Vector2, reward: int) -> void:
 	var gold_effect := VisualEffectScript.new()
@@ -306,7 +430,29 @@ func _use_arrow_rain() -> bool:
 	ability_cooldown = ABILITY_COOLDOWN
 	ui_controller.update_ability_cooldown(ability_cooldown)
 	ui_controller.set_message("Ok Yağmuru!")
+	if tutorial_active and tutorial_step == 3:
+		_complete_tutorial()
 	return true
+
+
+func _on_bomb_explosion(world_position: Vector2, hit_count: int) -> void:
+	var explosion_effect := VisualEffectScript.new()
+	add_child(explosion_effect)
+	explosion_effect.global_position = world_position
+	explosion_effect.setup_status_flash(Color("f2a15d"))
+	if (
+		hit_count <= 0
+		or not bool(save_manager.screen_shake_enabled)
+		or game_over
+	):
+		return
+	if world_shake_tween != null and world_shake_tween.is_valid():
+		world_shake_tween.kill()
+	position = Vector2.ZERO
+	world_shake_tween = create_tween()
+	world_shake_tween.tween_property(self, "position", Vector2(4.0, -3.0), 0.035)
+	world_shake_tween.tween_property(self, "position", Vector2(-3.0, 2.0), 0.045)
+	world_shake_tween.tween_property(self, "position", Vector2.ZERO, 0.055)
 
 func _finish_game() -> void:
 	if game_over:
@@ -314,6 +460,7 @@ func _finish_game() -> void:
 	game_over = true
 	game_over_trigger_count += 1
 	wave_manager.set_game_over()
+	_reset_game_speed()
 	ui_controller.set_message("Savunma Düştü")
 	_close_tower_panel()
 	_stop_combat()
@@ -324,6 +471,7 @@ func _finish_victory() -> void:
 	if victory_shown or game_over:
 		return
 	victory_shown = true
+	_reset_game_speed()
 	_stop_combat()
 	var health_percent: int = int(round(
 		float(base.health) / float(maxi(1, base.max_health)) * 100.0
@@ -346,6 +494,7 @@ func _finish_victory() -> void:
 func _pause_game() -> void:
 	if game_over or victory_shown or get_tree().paused:
 		return
+	Engine.time_scale = 1.0
 	ui_controller.show_pause()
 	get_tree().paused = true
 
@@ -353,6 +502,7 @@ func _pause_game() -> void:
 func _resume_game() -> void:
 	get_tree().paused = false
 	ui_controller.hide_pause()
+	Engine.time_scale = selected_game_speed
 
 func _restart_game() -> void:
 	_prepare_restart()
@@ -361,6 +511,7 @@ func _restart_game() -> void:
 
 func _next_level() -> void:
 	get_tree().paused = false
+	_reset_game_speed()
 	if level_data.id >= LevelData.create_catalog().size():
 		get_tree().change_scene_to_file("res://scenes/level_select.tscn")
 		return
@@ -369,6 +520,7 @@ func _next_level() -> void:
 	get_tree().reload_current_scene()
 
 func _prepare_restart() -> void:
+	_reset_game_speed()
 	_close_tower_panel()
 	for node in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(node):
@@ -386,6 +538,9 @@ func _prepare_restart() -> void:
 	victory_shown = false
 	get_tree().paused = false
 	wave = 0
+	wave_preview_pending = false
+	tutorial_active = false
+	tutorial_step = 0
 	ability_cooldown = 0.0
 	ui_controller.update_ability_cooldown(0.0)
 	wave_manager.reset()
@@ -394,6 +549,8 @@ func _prepare_restart() -> void:
 	queue_redraw()
 
 func _stop_combat() -> void:
+	tower_build_manager.input_enabled = false
+	tower_build_manager.clear_range_indicator()
 	archer.stop_combat()
 	for tower in towers:
 		if is_instance_valid(tower):
@@ -407,7 +564,53 @@ func _stop_combat() -> void:
 
 func _update_ui() -> void:
 	ui_controller.update_gold(economy.gold, false)
-	ui_controller.update_status(wave, base.health, active_enemy_count)
+	ui_controller.update_status(wave, base.health, active_enemy_count, total_waves)
+
+
+func _set_game_speed(speed: float) -> void:
+	if game_over or victory_shown or get_tree().paused:
+		return
+	selected_game_speed = 2.0 if speed >= 1.5 else 1.0
+	Engine.time_scale = selected_game_speed
+	ui_controller.set_speed(selected_game_speed)
+
+
+func _reset_game_speed() -> void:
+	selected_game_speed = 1.0
+	Engine.time_scale = 1.0
+	if is_instance_valid(ui_controller):
+		ui_controller.set_speed(1.0)
+
+
+func _begin_tutorial_if_needed() -> bool:
+	if level_data.id != 1 or bool(save_manager.tutorial_completed):
+		return false
+	tutorial_active = true
+	tutorial_step = 0
+	ui_controller.show_tutorial(tutorial_step)
+	return true
+
+
+func _set_tutorial_step(step: int) -> void:
+	if not tutorial_active:
+		return
+	tutorial_step = clampi(step, 0, 3)
+	ui_controller.show_tutorial(tutorial_step)
+
+
+func _complete_tutorial() -> void:
+	if not tutorial_active and bool(save_manager.tutorial_completed):
+		return
+	tutorial_active = false
+	tutorial_step = 0
+	ui_controller.hide_tutorial()
+	save_manager.complete_tutorial()
+	if wave == 0 and wave_manager.state == WaveManager.WaveState.WAITING:
+		_queue_next_wave_preview()
+
+
+func confirm_wave_preview_for_test() -> void:
+	ui_controller.confirm_wave_preview_for_test()
 
 func _draw() -> void:
 	var visible_size: Vector2 = get_viewport_rect().size

@@ -9,6 +9,7 @@ var is_heavy: bool = false
 var slow_ratio: float = 0.0
 var slow_duration: float = 0.0
 var explosion_radius: float = 0.0
+var critical: bool = false
 
 func _ready() -> void:
 	add_to_group("projectiles")
@@ -20,7 +21,8 @@ func setup(
 	heavy_projectile: bool = false,
 	new_slow_ratio: float = 0.0,
 	new_slow_duration: float = 0.0,
-	new_explosion_radius: float = 0.0
+	new_explosion_radius: float = 0.0,
+	new_critical: bool = false
 ) -> void:
 	target = new_target
 	damage = new_damage
@@ -29,6 +31,7 @@ func setup(
 	slow_ratio = maxf(0.0, new_slow_ratio)
 	slow_duration = maxf(0.0, new_slow_duration)
 	explosion_radius = maxf(0.0, new_explosion_radius)
+	critical = new_critical
 	set_process(true)
 	queue_redraw()
 
@@ -56,7 +59,7 @@ func _process(delta: float) -> void:
 			_apply_area_damage(target.global_position)
 		else:
 			if target.has_method("take_damage"):
-				target.take_damage(damage)
+				target.take_damage(damage, critical)
 			if slow_ratio > 0.0 and target.has_method("apply_slow"):
 				target.apply_slow(slow_ratio, slow_duration)
 		queue_free()
@@ -75,7 +78,14 @@ func _apply_area_damage(center: Vector2) -> void:
 			continue
 		hit_ids[instance_id] = true
 		if enemy.has_method("take_damage"):
-			enemy.take_damage(damage)
+			enemy.take_damage(damage, critical)
+	if not hit_ids.is_empty():
+		get_tree().call_group(
+			"gameplay_root",
+			"_on_bomb_explosion",
+			center,
+			hit_ids.size()
+		)
 
 func _draw() -> void:
 	var shaft_width: float = 7.0 if is_heavy else 4.0

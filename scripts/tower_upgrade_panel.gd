@@ -126,6 +126,7 @@ func refresh() -> void:
 	stats_label.text = "Hasar: %.1f   Menzil: %.0f   Atış: %.2f sn" % [
 		tower.damage, tower.attack_range, tower.fire_interval
 	]
+	stats_label.tooltip_text = data.get_role_summary()
 	var cost: int = tower.get_upgrade_cost()
 	if tower.can_upgrade():
 		var next_level: int = tower.level + 1
@@ -141,6 +142,7 @@ func refresh() -> void:
 		upgrade_button.text = "Maksimum Seviye"
 		upgrade_button.disabled = true
 	sell_button.text = "Sat  •  +%d Altın" % tower.get_sell_refund()
+	title_label.tooltip_text = data.get_role_summary()
 	for index in target_mode_selector.item_count:
 		if target_mode_selector.get_item_id(index) == tower.target_mode:
 			target_mode_selector.select(index)

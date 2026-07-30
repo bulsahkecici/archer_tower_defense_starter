@@ -14,6 +14,7 @@ func _run() -> void:
 	audio_manager = root.get_node("AudioManager")
 	save_manager.set_save_path("/private/tmp/archer_stage9_save.json")
 	save_manager.reset_defaults()
+	save_manager.tutorial_completed = true
 	save_manager.save_data()
 	_test_export_and_assets()
 	_test_safe_area_fallbacks()

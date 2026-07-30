@@ -2,6 +2,7 @@ extends Control
 class_name TowerSelectionPanel
 
 signal tower_selected(tower_type: ShooterUnit.TowerType)
+signal tower_previewed(tower_type: ShooterUnit.TowerType)
 signal closed
 
 var spot_cost: int = 0
@@ -123,19 +124,31 @@ func _build_interface() -> void:
 	archer_button.pressed.connect(
 		func() -> void: tower_selected.emit(ShooterUnit.TowerType.ARCHER)
 	)
+	archer_button.mouse_entered.connect(
+		func() -> void: tower_previewed.emit(ShooterUnit.TowerType.ARCHER)
+	)
 	archer_cost_label = archer_button.get_node("Content/Cost") as Label
 
 	crossbow_button = _create_tower_card(cards, crossbow_data, true)
 	crossbow_button.pressed.connect(
 		func() -> void: tower_selected.emit(ShooterUnit.TowerType.CROSSBOW)
 	)
+	crossbow_button.mouse_entered.connect(
+		func() -> void: tower_previewed.emit(ShooterUnit.TowerType.CROSSBOW)
+	)
 	crossbow_cost_label = crossbow_button.get_node("Content/Cost") as Label
 
 	ice_button = _create_tower_card(cards, ice_data, false)
 	ice_button.pressed.connect(func() -> void: tower_selected.emit(ShooterUnit.TowerType.ICE))
+	ice_button.mouse_entered.connect(
+		func() -> void: tower_previewed.emit(ShooterUnit.TowerType.ICE)
+	)
 
 	bomb_button = _create_tower_card(cards, bomb_data, true)
 	bomb_button.pressed.connect(func() -> void: tower_selected.emit(ShooterUnit.TowerType.BOMB))
+	bomb_button.mouse_entered.connect(
+		func() -> void: tower_previewed.emit(ShooterUnit.TowerType.BOMB)
+	)
 
 	var cancel_button := Button.new()
 	cancel_button.custom_minimum_size = Vector2(300.0, 72.0)
@@ -195,12 +208,14 @@ func _create_tower_card(
 	content.add_child(name_label)
 
 	var description_label := Label.new()
-	description_label.custom_minimum_size = Vector2(300.0, 92.0)
+	description_label.custom_minimum_size = Vector2(300.0, 132.0)
 	description_label.text = (
-		"Hasar %.0f  •  Menzil %.0f\nAtış %.1f sn\n%s"
-		% [data.damage, data.attack_range, data.fire_interval, data.description]
+		"Hasar %.0f  •  Menzil %.0f  •  Atış %.1f sn\n%s"
+		% [data.damage, data.attack_range, data.fire_interval, data.get_role_summary()]
 	)
 	description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	description_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	description_label.add_theme_font_size_override("font_size", 21)
 	description_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(description_label)
@@ -284,3 +299,7 @@ func _arm_input() -> void:
 func _close() -> void:
 	closed.emit()
 	queue_free()
+
+
+func preview_tower(tower_type: ShooterUnit.TowerType) -> void:
+	tower_previewed.emit(tower_type)
