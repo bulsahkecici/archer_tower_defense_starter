@@ -14,6 +14,7 @@ signal reward_selected(reward_id: StringName)
 const WavePreviewPanelScript = preload("res://scripts/wave_preview_panel.gd")
 const TutorialOverlayScript = preload("res://scripts/tutorial_overlay.gd")
 const RewardChoicePanelScript = preload("res://scripts/reward_choice_panel.gd")
+const PerformancePanelScript = preload("res://scripts/performance_panel.gd")
 
 var interface_layer: CanvasLayer
 var gold_label: Label
@@ -48,6 +49,8 @@ var reward_panel: RewardChoicePanel
 var achievement_notification: PanelContainer
 var achievement_notification_tween: Tween
 var achievement_notification_count: int = 0
+var debug_panel: DebugPerformancePanel
+var last_summary_text: String = ""
 
 
 func setup() -> void:
@@ -56,6 +59,9 @@ func setup() -> void:
 	interface_layer.layer = 10
 	add_child(interface_layer)
 	_build_hud()
+	debug_panel = PerformancePanelScript.new()
+	interface_layer.add_child(debug_panel)
+	debug_panel.setup(get_parent())
 
 
 func _process(_delta: float) -> void:
@@ -467,7 +473,11 @@ func show_boss_warning(wave: int) -> void:
 	boss_warning_tween.tween_callback(func() -> void: boss_warning_label.visible = false)
 
 
-func show_game_over(wave: int, total_gold: int) -> CanvasLayer:
+func show_game_over(
+	wave: int,
+	total_gold: int,
+	run_summary: Dictionary = {}
+) -> CanvasLayer:
 	if is_instance_valid(game_over_layer):
 		return game_over_layer
 	game_over_layer = CanvasLayer.new()
@@ -516,7 +526,8 @@ func show_game_over(wave: int, total_gold: int) -> CanvasLayer:
 	content.add_child(title)
 	var result := Label.new()
 	result.custom_minimum_size = Vector2(620.0, 150.0)
-	result.text = "Ulaşılan dalga: %d\nKazanılan toplam altın: %d" % [wave, total_gold]
+	last_summary_text = _format_run_summary(run_summary, wave, total_gold)
+	result.text = last_summary_text
 	result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	result.add_theme_font_size_override("font_size", 36)
@@ -562,13 +573,18 @@ func show_victory(
 	stars: int,
 	health: int,
 	total_gold: int,
-	tower_count: int = 0
+	tower_count: int = 0,
+	run_summary: Dictionary = {}
 ) -> CanvasLayer:
 	if is_instance_valid(victory_layer):
 		return victory_layer
+	last_summary_text = _format_run_summary(run_summary, 0, total_gold)
 	victory_layer = _create_action_layer(
-		"BÖLÜM TAMAMLANDI\n%s\n%s\nKale: %d  Altın: %d  Kule: %d" % [
-			level_name, "★".repeat(clampi(stars, 1, 3)), health, total_gold, tower_count
+		"BÖLÜM TAMAMLANDI\n%s\n%s\n%s" % [
+			level_name,
+			"★".repeat(clampi(stars, 1, 3)),
+			last_summary_text if not run_summary.is_empty()
+				else "Kale: %d  Altın: %d  Kule: %d" % [health, total_gold, tower_count]
 		],
 		[
 			["Tekrar Oyna", func() -> void: restart_requested.emit()],
@@ -577,6 +593,36 @@ func show_victory(
 		]
 	)
 	return victory_layer
+
+
+func _format_run_summary(
+	summary: Dictionary,
+	fallback_wave: int,
+	fallback_gold: int
+) -> String:
+	if summary.is_empty():
+		return "Ulaşılan dalga: %d\nKazanılan toplam altın: %d" % [
+			fallback_wave,
+			fallback_gold
+		]
+	var achievements: Array = summary.get("achievements_unlocked", [])
+	return (
+		"Dalga: %d  •  Kale: %d\nAltın: %d  •  Düşman: %d  •  Boss: %d\n"
+		+ "Kule: %d  •  Yükseltme: %d  •  Satış: %d\n"
+		+ "Ok Yağmuru: %d  •  Favori: %s\nBaşarım: %s"
+	) % [
+		int(summary.get("wave", fallback_wave)),
+		int(summary.get("base_health", 0)),
+		int(summary.get("gold_earned", fallback_gold)),
+		int(summary.get("enemies_defeated", 0)),
+		int(summary.get("bosses_defeated", 0)),
+		int(summary.get("towers_built", 0)),
+		int(summary.get("upgrades", 0)),
+		int(summary.get("towers_sold", 0)),
+		int(summary.get("arrow_rain_uses", 0)),
+		String(summary.get("favorite_tower", &"none")),
+		", ".join(achievements) if not achievements.is_empty() else "Yok"
+	]
 
 
 func _change_scene_unpaused(scene_path: String) -> void:

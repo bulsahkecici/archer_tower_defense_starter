@@ -232,6 +232,11 @@ func open_tower_upgrade(index: int) -> bool:
 	tower_upgrade_panel = UpgradePanelScript.new()
 	interface_layer.add_child(tower_upgrade_panel)
 	tower_upgrade_panel.setup(tower, economy)
+	if is_instance_valid(run_modifier_manager):
+		tower_upgrade_panel.upgrade_cost_override = (
+			run_modifier_manager.get_upgrade_cost(tower.get_upgrade_cost())
+		)
+		tower_upgrade_panel.refresh()
 	tower_upgrade_panel.upgrade_requested.connect(_upgrade_selected_tower)
 	tower_upgrade_panel.sell_requested.connect(_sell_selected_tower)
 	tower_upgrade_panel.closed.connect(_on_upgrade_panel_closed)
@@ -262,6 +267,9 @@ func _upgrade_selected_tower() -> bool:
 		if is_instance_valid(run_modifier_manager):
 			run_modifier_manager.consume_upgrade_discount()
 			run_modifier_manager.apply_to_tower(tower)
+			tower_upgrade_panel.upgrade_cost_override = (
+				run_modifier_manager.get_upgrade_cost(tower.get_upgrade_cost())
+			)
 		synergy_manager.recompute(towers)
 		_show_tower_range(tower)
 		message_requested.emit("%s seviye %d oldu!" % [tower.tower_data.display_name, tower.level])

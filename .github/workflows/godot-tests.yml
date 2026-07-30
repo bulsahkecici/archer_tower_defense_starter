@@ -1,0 +1,63 @@
+name: Godot Runtime Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Godot 4.7.1
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.1
+          use-dotnet: false
+          include-templates: false
+
+      - name: Verify Godot version
+        run: godot --version
+
+      - name: Import project and check parsers
+        run: godot --headless --editor --path . --quit
+
+      - name: Run Stage 3-13 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            "stage3_runtime_test:STAGE3_TEST_PASS"
+            "stage4_runtime_test:STAGE4_TEST_PASS"
+            "stage5_runtime_test:STAGE5_TEST_PASS"
+            "refactor_runtime_test:REFACTOR_TEST_PASS"
+            "gameplay_regression_test:GAMEPLAY_REGRESSION_TEST_PASS"
+            "stage6_runtime_test:STAGE6_TEST_PASS"
+            "stage7_runtime_test:STAGE7_TEST_PASS"
+            "stage8_runtime_test:STAGE8_TEST_PASS"
+            "stage9_runtime_test:STAGE9_TEST_PASS"
+            "stage10_runtime_test:STAGE10_TEST_PASS"
+            "stage11_runtime_test:STAGE11_TEST_PASS"
+            "stage12_runtime_test:STAGE12_TEST_PASS"
+            "stage13_runtime_test:STAGE13_TEST_PASS"
+          )
+          for entry in "${tests[@]}"; do
+            test_name="${entry%%:*}"
+            pass_token="${entry##*:}"
+            output="/tmp/${test_name}.stdout"
+            godot \
+              --headless \
+              --audio-driver Dummy \
+              --display-driver headless \
+              --rendering-driver dummy \
+              --log-file "/tmp/${test_name}.log" \
+              --path . \
+              --script "res://tests/${test_name}.gd" | tee "${output}"
+            grep -q "${pass_token}" "${output}"
+          done

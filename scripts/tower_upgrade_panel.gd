@@ -18,6 +18,7 @@ var sell_button: Button
 var target_mode_selector: OptionButton
 var synergy_label: Label
 var input_armed: bool = false
+var upgrade_cost_override: int = -1
 
 
 func setup(selected_tower: ShooterUnit, economy_manager: EconomyManager) -> void:
@@ -84,6 +85,11 @@ func _build_interface() -> void:
 	target_mode_selector.add_item("En Yüksek Can", ShooterUnit.TargetMode.HIGHEST_HEALTH)
 	target_mode_selector.add_item("En Düşük Can", ShooterUnit.TargetMode.LOWEST_HEALTH)
 	target_mode_selector.item_selected.connect(_on_target_mode_selected)
+	var target_label := Label.new()
+	target_label.text = "HEDEFLEME MODU"
+	target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	target_label.add_theme_font_size_override("font_size", 22)
+	content.add_child(target_label)
 	content.add_child(target_mode_selector)
 
 	upgrade_button = Button.new()
@@ -125,25 +131,36 @@ func refresh() -> void:
 	var data: TowerData = tower.tower_data
 	title_label.text = data.display_name
 	level_label.text = "SEVİYE %d / %d" % [tower.level, data.maximum_level]
-	stats_label.text = "Hasar: %.1f   Menzil: %.0f   Atış: %.2f sn" % [
-		tower.damage, tower.attack_range, tower.fire_interval
-	]
+	stats_label.text = data.get_role_summary()
 	stats_label.tooltip_text = data.get_role_summary()
-	var cost: int = tower.get_upgrade_cost()
+	var cost: int = (
+		upgrade_cost_override
+		if upgrade_cost_override >= 0 else tower.get_upgrade_cost()
+	)
 	if tower.can_upgrade():
 		var next_level: int = tower.level + 1
-		next_stats_label.text = "Sonraki: %.1f hasar • %.0f menzil • %.2f sn" % [
-			data.get_damage(next_level),
-			data.get_attack_range(next_level),
-			data.get_fire_interval(next_level)
+		var damage_factor: float = tower.damage / maxf(0.01, tower.base_damage_stat)
+		var range_factor: float = tower.attack_range / maxf(0.01, tower.base_range_stat)
+		var interval_factor: float = (
+			tower.fire_interval / maxf(0.01, tower.base_fire_interval_stat)
+		)
+		next_stats_label.text = (
+			"Hasar: %.1f → %.1f\nMenzil: %.0f → %.0f\nAtış: %.2f sn → %.2f sn"
+		) % [
+			tower.damage,
+			data.get_damage(next_level) * damage_factor,
+			tower.attack_range,
+			data.get_attack_range(next_level) * range_factor,
+			tower.fire_interval,
+			data.get_fire_interval(next_level) * interval_factor
 		]
-		upgrade_button.text = "Yükselt  •  %d Altın" % cost
+		upgrade_button.text = "YÜKSELT: %d ALTIN" % cost
 		upgrade_button.disabled = cost <= 0 or not economy.can_afford(cost)
 	else:
 		next_stats_label.text = "Maksimum Seviye"
 		upgrade_button.text = "Maksimum Seviye"
 		upgrade_button.disabled = true
-	sell_button.text = "Sat  •  +%d Altın" % tower.get_sell_refund()
+	sell_button.text = "SAT: +%d ALTIN" % tower.get_sell_refund()
 	title_label.tooltip_text = data.get_role_summary()
 	var active_synergies: Array[String] = tower.get_active_modifier_descriptions()
 	synergy_label.text = (

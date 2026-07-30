@@ -47,6 +47,7 @@ var upgrades_count: int = 0
 var towers_sold_count: int = 0
 var arrow_rain_uses: int = 0
 var tower_type_build_counts: Dictionary[StringName, int] = {}
+var run_unlocked_achievements: Array[String] = []
 
 var base: DefenseBase
 var archer: ShooterUnit
@@ -167,9 +168,7 @@ func _create_controllers() -> void:
 	ui_controller.wave_preview_ready.connect(_begin_previewed_wave)
 	ui_controller.tutorial_skipped.connect(_complete_tutorial)
 	ui_controller.reward_selected.connect(_on_reward_selected)
-	achievement_manager.achievement_unlocked.connect(
-		ui_controller.show_achievement_notification
-	)
+	achievement_manager.achievement_unlocked.connect(_on_achievement_unlocked)
 	ui_controller.set_ability_cooldown_duration(ABILITY_COOLDOWN)
 
 	run_modifier_manager = RunModifierManagerScript.new()
@@ -594,7 +593,7 @@ func _finish_game() -> void:
 	_stop_combat()
 	if endless_mode:
 		save_manager.update_endless_high_wave(wave)
-	ui_controller.show_game_over(wave, economy.total_gold_earned)
+	ui_controller.show_game_over(wave, economy.total_gold_earned, get_run_summary())
 
 
 func _finish_victory() -> void:
@@ -625,7 +624,8 @@ func _finish_victory() -> void:
 		stars,
 		base.health,
 		economy.total_gold_earned,
-		towers.size()
+		towers.size(),
+		get_run_summary()
 	)
 
 
@@ -691,6 +691,7 @@ func _prepare_restart() -> void:
 	towers_sold_count = 0
 	arrow_rain_uses = 0
 	tower_type_build_counts.clear()
+	run_unlocked_achievements.clear()
 	economy.setup(level_data.starting_gold)
 	base.max_health = level_data.base_health
 	base.reset()
@@ -715,8 +716,18 @@ func get_run_summary() -> Dictionary:
 		"towers_sold": towers_sold_count,
 		"arrow_rain_uses": arrow_rain_uses,
 		"favorite_tower": favorite_tower,
-		"endless": endless_mode
+		"endless": endless_mode,
+		"base_health": base.health,
+		"achievements_unlocked": run_unlocked_achievements.duplicate()
 	}
+
+
+func _on_achievement_unlocked(
+	achievement_id: StringName,
+	title: String
+) -> void:
+	run_unlocked_achievements.append(title)
+	ui_controller.show_achievement_notification(achievement_id, title)
 
 func _stop_combat() -> void:
 	tower_build_manager.input_enabled = false

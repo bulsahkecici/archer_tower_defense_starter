@@ -1,6 +1,8 @@
 extends Node
 class_name GameSaveManager
 
+const CURRENT_SAVE_VERSION: int = 1
+
 var save_path: String = "user://save_data.json"
 var unlocked_level: int = 1
 var level_stars: Dictionary = {}
@@ -21,6 +23,8 @@ var selected_cosmetics: Dictionary = {
 	"road_flags": ""
 }
 var selected_game_mode: StringName = &"story"
+var loaded_save_version: int = CURRENT_SAVE_VERSION
+var future_version_detected: bool = false
 
 
 func _ready() -> void:
@@ -29,6 +33,7 @@ func _ready() -> void:
 
 func set_save_path(path: String) -> void:
 	save_path = path
+	future_version_detected = false
 
 
 func load_data() -> bool:
@@ -50,11 +55,15 @@ func load_data() -> bool:
 		reset_defaults()
 		save_data()
 		return false
-	_apply_dictionary(parsed as Dictionary)
+	var raw_data: Dictionary = parsed as Dictionary
+	var migrated_data: Dictionary = _migrate_data(raw_data)
+	_apply_dictionary(migrated_data)
 	return true
 
 
 func save_data() -> bool:
+	if future_version_detected:
+		return false
 	var temporary_path: String = save_path + ".tmp"
 	var file := FileAccess.open(temporary_path, FileAccess.WRITE)
 	if file == null:
@@ -81,6 +90,7 @@ func save_data() -> bool:
 
 func to_dictionary() -> Dictionary:
 	return {
+		"save_version": CURRENT_SAVE_VERSION,
 		"unlocked_level": unlocked_level,
 		"level_stars": level_stars,
 		"music_volume": music_volume,
@@ -98,6 +108,7 @@ func to_dictionary() -> Dictionary:
 
 
 func _apply_dictionary(data: Dictionary) -> void:
+	loaded_save_version = int(data.get("save_version", CURRENT_SAVE_VERSION))
 	unlocked_level = clampi(int(data.get("unlocked_level", 1)), 1, 5)
 	level_stars = data.get("level_stars", {}) as Dictionary
 	music_volume = clampf(float(data.get("music_volume", 0.8)), 0.0, 1.0)
@@ -133,6 +144,8 @@ func reset_defaults() -> void:
 	selected_cosmetics = {}
 	_ensure_cosmetic_defaults()
 	selected_game_mode = &"story"
+	loaded_save_version = CURRENT_SAVE_VERSION
+	future_version_detected = false
 
 
 func is_level_unlocked(level_id: int) -> bool:
@@ -191,3 +204,33 @@ func _ensure_cosmetic_defaults() -> void:
 		selected_cosmetics["tower_accent"] = ""
 	if not selected_cosmetics.has("road_flags"):
 		selected_cosmetics["road_flags"] = ""
+
+
+func _migrate_data(source: Dictionary) -> Dictionary:
+	var migrated: Dictionary = source.duplicate(true)
+	var source_version: int = int(migrated.get("save_version", 0))
+	if source_version > CURRENT_SAVE_VERSION:
+		future_version_detected = true
+		loaded_save_version = source_version
+		return migrated
+	future_version_detected = false
+	if source_version == 0:
+		migrated["achievement_progress"] = migrated.get("achievement_progress", {})
+		migrated["unlocked_achievements"] = migrated.get("unlocked_achievements", [])
+		migrated["selected_cosmetics"] = migrated.get("selected_cosmetics", {
+			"arrow_trail": "default_arrow",
+			"castle_roof": "green_roof",
+			"tower_accent": "",
+			"road_flags": ""
+		})
+		migrated["endless_high_wave"] = int(migrated.get("endless_high_wave", 0))
+		migrated["tutorial_completed"] = bool(migrated.get(
+			"tutorial_completed",
+			not bool(migrated.get("first_launch", false))
+		))
+		migrated["screen_shake_enabled"] = bool(
+			migrated.get("screen_shake_enabled", true)
+		)
+		migrated["save_version"] = 1
+	loaded_save_version = int(migrated.get("save_version", CURRENT_SAVE_VERSION))
+	return migrated
