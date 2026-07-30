@@ -42,6 +42,13 @@ func setup(cost: int) -> void:
 	archer_button.name = "ArcherCard"
 	archer_button.custom_minimum_size = Vector2(410.0, 160.0)
 	archer_button.text = ""
+	archer_button.toggle_mode = true
+	var selected_style := StyleBoxFlat.new()
+	selected_style.bg_color = Color("244f43")
+	selected_style.border_color = Color("8ee6a3")
+	selected_style.set_border_width_all(5)
+	selected_style.set_corner_radius_all(18)
+	archer_button.add_theme_stylebox_override("pressed", selected_style)
 	archer_button.pressed.connect(func() -> void: archer_selected.emit())
 	content.add_child(archer_button)
 	var card_margin := MarginContainer.new()
@@ -90,3 +97,16 @@ func setup(cost: int) -> void:
 	cancel_button.add_theme_font_size_override("font_size", 23)
 	cancel_button.pressed.connect(func() -> void: cancel_requested.emit())
 	content.add_child(cancel_button)
+	set_selection_active(false)
+
+
+func set_selection_active(active: bool) -> void:
+	if is_instance_valid(archer_button):
+		archer_button.set_pressed_no_signal(active)
+		archer_button.tooltip_text = (
+			"Seçildi — haritada bir platforma dokun"
+			if active else "Okçu Kulesi seç"
+		)
+	if is_instance_valid(cancel_button):
+		cancel_button.disabled = not active
+		cancel_button.modulate = Color.WHITE if active else Color(0.65, 0.65, 0.65, 0.75)

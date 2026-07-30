@@ -47,8 +47,18 @@ func _run() -> void:
 
 	var first_pad: BuildPad3D = game.map.build_pads[0]
 	var first_pad_screen: Vector2 = game.game_camera.unproject_position(first_pad.global_position)
-	game.tower_palette.archer_button.pressed.emit()
+	await _push_mouse_click(
+		game.tower_palette.archer_button.get_global_rect().get_center()
+	)
 	_expect(game.placement.selected_data != null, "Mobil kule kartı Okçu Kulesi seçimini başlatmalı")
+	_expect(
+		game.tower_palette.archer_button.button_pressed,
+		"Seçilen kule kartı görsel olarak basılı durumda kalmalı"
+	)
+	_expect(
+		first_pad.pad_material.albedo_color.is_equal_approx(Color("73c989")),
+		"Seçimden sonra satın alınabilir platformlar yeşil vurgulanmalı"
+	)
 	_expect(
 		game.placement.raycast_build_pad(first_pad_screen) == first_pad,
 		"Kamera ray'i ekrandaki inşa noktasını bulmalı"
@@ -65,12 +75,7 @@ func _run() -> void:
 		and game.placement.ghost_root.visible,
 		"Yol üzerindeki ghost kırmızı/geçersiz durumda gösterilmeli"
 	)
-	var mouse_press := InputEventMouseButton.new()
-	mouse_press.button_index = MOUSE_BUTTON_LEFT
-	mouse_press.position = first_pad_screen
-	mouse_press.pressed = true
-	game._unhandled_input(mouse_press)
-	await process_frame
+	await _push_mouse_click(first_pad_screen)
 	_expect(first_pad.occupied, "Mouse girişiyle seçilen noktaya kule kurulmalı")
 	_expect(game.economy.gold == 20, "15 altınlık kurulum maliyeti tam bir kez harcanmalı")
 	_expect(game.towers.size() == 1, "İlk yerleştirme yalnızca bir kule üretmeli")
@@ -83,12 +88,12 @@ func _run() -> void:
 
 	var second_pad: BuildPad3D = game.map.build_pads[1]
 	game.economy.add_gold(20)
-	game.placement.select_archer()
-	var touch_press := InputEventScreenTouch.new()
-	touch_press.position = game.game_camera.unproject_position(second_pad.global_position)
-	touch_press.pressed = true
-	game._unhandled_input(touch_press)
-	await process_frame
+	await _push_mouse_click(
+		game.tower_palette.archer_button.get_global_rect().get_center()
+	)
+	await _push_touch(
+		game.game_camera.unproject_position(second_pad.global_position)
+	)
 	_expect(second_pad.occupied, "Dokunmatik girişle kule kurulmalı")
 	_expect(game.towers.size() == 2, "Mouse ve dokunmatik kurulumları ayrı kuleler üretmeli")
 	var gold_before_unaffordable: int = game.economy.gold
@@ -101,7 +106,9 @@ func _run() -> void:
 		game.economy.gold == gold_before_unaffordable,
 		"Yetersiz altın reddi bakiyeyi değiştirmemeli"
 	)
-	game.tower_palette.cancel_button.pressed.emit()
+	await _push_mouse_click(
+		game.tower_palette.cancel_button.get_global_rect().get_center()
+	)
 	_expect(game.placement.selected_data == null, "Mobil İptal düğmesi yerleştirmeyi temizlemeli")
 
 	for tower in game.towers:
@@ -273,3 +280,43 @@ func _expect(condition: bool, message: String) -> void:
 	else:
 		failures += 1
 		push_error("FAIL: %s" % message)
+
+
+func _to_window_position(viewport_position: Vector2) -> Vector2:
+	return (
+		viewport_position
+		* Vector2(root.size)
+		/ root.get_visible_rect().size
+	)
+
+
+func _push_mouse_click(viewport_position: Vector2) -> void:
+	var window_position: Vector2 = _to_window_position(viewport_position)
+	var motion := InputEventMouseMotion.new()
+	motion.position = window_position
+	root.push_input(motion)
+	await process_frame
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.position = window_position
+	press.pressed = true
+	root.push_input(press)
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.position = window_position
+	release.pressed = false
+	root.push_input(release)
+	await process_frame
+
+
+func _push_touch(viewport_position: Vector2) -> void:
+	var window_position: Vector2 = _to_window_position(viewport_position)
+	var press := InputEventScreenTouch.new()
+	press.position = window_position
+	press.pressed = true
+	root.push_input(press)
+	var release := InputEventScreenTouch.new()
+	release.position = window_position
+	release.pressed = false
+	root.push_input(release)
+	await process_frame

@@ -170,8 +170,9 @@ func _build_ui() -> void:
 	tower_palette = TowerPalette3D.new()
 	ui_controller.interface_layer.add_child(tower_palette)
 	tower_palette.setup(level_data.build_spot_costs[0])
-	tower_palette.archer_selected.connect(placement.select_archer)
+	tower_palette.archer_selected.connect(_toggle_archer_selection)
 	tower_palette.cancel_requested.connect(placement.cancel)
+	placement.selection_changed.connect(_on_placement_selection_changed)
 
 
 func start_vertical_slice_wave() -> bool:
@@ -237,6 +238,19 @@ func _on_tower_placed(tower: ArcherTower3D, _pad: BuildPad3D, _cost: int) -> voi
 
 func _on_placement_rejected(reason: String) -> void:
 	ui_controller.set_message(reason)
+
+
+func _toggle_archer_selection() -> void:
+	if placement.selected_data == null:
+		placement.select_archer()
+	else:
+		placement.cancel()
+
+
+func _on_placement_selection_changed(active: bool) -> void:
+	tower_palette.set_selection_active(active)
+	if active:
+		ui_controller.set_message("OKÇU SEÇİLDİ • ALTIN RENKLİ BİR PLATFORMA DOKUN")
 
 
 func _on_gold_changed(_current_gold: int) -> void:

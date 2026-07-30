@@ -34,7 +34,9 @@ func setup(
 
 func select_archer() -> void:
 	selected_data = TowerData.create_archer()
-	ghost_root.visible = true
+	ghost_root.visible = false
+	for pad in build_pads:
+		pad.set_preview(is_pad_valid(pad))
 	selection_changed.emit(true)
 
 
