@@ -16,6 +16,7 @@ var next_stats_label: Label
 var upgrade_button: Button
 var sell_button: Button
 var target_mode_selector: OptionButton
+var synergy_label: Label
 var input_armed: bool = false
 
 
@@ -73,6 +74,7 @@ func _build_interface() -> void:
 	level_label = _create_label(content, 30)
 	stats_label = _create_label(content, 28)
 	next_stats_label = _create_label(content, 26)
+	synergy_label = _create_label(content, 23)
 
 	target_mode_selector = OptionButton.new()
 	target_mode_selector.custom_minimum_size = Vector2(520.0, 70.0)
@@ -143,6 +145,11 @@ func refresh() -> void:
 		upgrade_button.disabled = true
 	sell_button.text = "Sat  •  +%d Altın" % tower.get_sell_refund()
 	title_label.tooltip_text = data.get_role_summary()
+	var active_synergies: Array[String] = tower.get_active_modifier_descriptions()
+	synergy_label.text = (
+		"AKTİF SİNERJİLER\n%s" % "\n".join(active_synergies)
+		if not active_synergies.is_empty() else "Aktif sinerji yok"
+	)
 	for index in target_mode_selector.item_count:
 		if target_mode_selector.get_item_id(index) == tower.target_mode:
 			target_mode_selector.select(index)

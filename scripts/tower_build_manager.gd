@@ -11,6 +11,7 @@ const ShooterScript = preload("res://scripts/shooter.gd")
 const PanelScript = preload("res://scripts/tower_selection_panel.gd")
 const UpgradePanelScript = preload("res://scripts/tower_upgrade_panel.gd")
 const RangeIndicatorScript = preload("res://scripts/range_indicator.gd")
+const SynergyManagerScript = preload("res://scripts/synergy_manager.gd")
 const BUILD_SPOT_COSTS: Array[int] = [15, 20, 25, 30]
 
 var build_spots: Array[Vector2] = [
@@ -36,6 +37,8 @@ var pressed_build_spot: int = -1
 var press_time: float = 0.0
 var input_enabled: bool = true
 var range_indicator: TowerRangeIndicator
+var synergy_manager: TowerSynergyManager
+var run_modifier_manager: RunModifierManager
 
 
 func configure_level(positions: Array[Vector2], costs: Array[int]) -> bool:
@@ -71,9 +74,15 @@ func setup(
 	range_indicator.z_index = 2
 	world_parent.add_child(range_indicator)
 	range_indicator.clear()
+	synergy_manager = SynergyManagerScript.new()
+	add_child(synergy_manager)
 	if not economy.gold_changed.is_connected(_on_gold_changed):
 		economy.gold_changed.connect(_on_gold_changed)
 	queue_redraw()
+
+
+func set_run_modifier_manager(manager: RunModifierManager) -> void:
+	run_modifier_manager = manager
 
 
 func _process(delta: float) -> void:
@@ -174,12 +183,15 @@ func select_tower(tower_type: ShooterUnit.TowerType) -> ShooterUnit:
 	tower.position = build_spots[selected_build_spot]
 	tower.z_index = clampi(int(tower.position.y), 0, 1900)
 	tower.setup_tower(tower_type, 1)
+	if is_instance_valid(run_modifier_manager):
+		run_modifier_manager.apply_to_tower(tower)
 	tower.invested_gold = cost
 	tower.build_spot_index = selected_build_spot
 	tower.play_build_animation()
 	towers.append(tower)
 	towers_by_spot[selected_build_spot] = tower
 	built_spots[selected_build_spot] = true
+	synergy_manager.recompute(towers)
 	var built_position: Vector2 = build_spots[selected_build_spot]
 	close_panel()
 	queue_redraw()
@@ -234,7 +246,11 @@ func _upgrade_selected_tower() -> bool:
 	if not is_instance_valid(tower) or not tower.can_upgrade():
 		tower_upgrade_panel.refresh()
 		return false
-	var cost: int = tower.get_upgrade_cost()
+	var base_cost: int = tower.get_upgrade_cost()
+	var cost: int = (
+		run_modifier_manager.get_upgrade_cost(base_cost)
+		if is_instance_valid(run_modifier_manager) else base_cost
+	)
 	if cost <= 0 or not economy.can_afford(cost):
 		tower_upgrade_panel.refresh()
 		return false
@@ -243,6 +259,10 @@ func _upgrade_selected_tower() -> bool:
 	if spent:
 		tower.invested_gold += cost
 		tower.upgrade()
+		if is_instance_valid(run_modifier_manager):
+			run_modifier_manager.consume_upgrade_discount()
+			run_modifier_manager.apply_to_tower(tower)
+		synergy_manager.recompute(towers)
 		_show_tower_range(tower)
 		message_requested.emit("%s seviye %d oldu!" % [tower.tower_data.display_name, tower.level])
 		tower_upgrade_panel.refresh()
@@ -268,6 +288,7 @@ func _sell_selected_tower() -> bool:
 	towers.erase(tower)
 	towers_by_spot[index] = null
 	built_spots[index] = false
+	synergy_manager.recompute(towers)
 	close_panel()
 	if refund > 0:
 		economy.add_gold(refund)
@@ -308,6 +329,8 @@ func reset() -> void:
 		if is_instance_valid(tower):
 			tower.queue_free()
 	towers.clear()
+	if is_instance_valid(synergy_manager):
+		synergy_manager.recompute(towers)
 	towers_by_spot.clear()
 	towers_by_spot.resize(build_spots.size())
 	towers_by_spot.fill(null)

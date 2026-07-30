@@ -106,6 +106,17 @@ func get_path_points() -> Array[Vector2]:
 	]
 
 
+func get_alternate_path_points() -> Array[Vector2]:
+	if map_theme != &"gold":
+		return get_path_points()
+	return [
+		Vector2(250.0, -80.0), Vector2(320.0, 250.0),
+		Vector2(700.0, 510.0), Vector2(390.0, 820.0),
+		Vector2(650.0, 1110.0), Vector2(720.0, 1430.0),
+		Vector2(790.0, 1695.0)
+	]
+
+
 func get_ground_color() -> Color:
 	match map_theme:
 		&"stone":

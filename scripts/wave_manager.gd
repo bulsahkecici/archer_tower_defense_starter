@@ -19,6 +19,7 @@ var state: WaveState = WaveState.WAITING
 var current_wave: int = 0
 var spawn_queue: Array[StringName] = []
 var enemy_definitions: Dictionary[StringName, EnemyData] = {}
+var level_id: int = 1
 
 
 func _ready() -> void:
@@ -50,6 +51,10 @@ func _create_enemy_definitions() -> void:
 
 func get_enemy_data(enemy_id: StringName) -> EnemyData:
 	return enemy_definitions.get(enemy_id) as EnemyData
+
+
+func configure_level(current_level_id: int) -> void:
+	level_id = clampi(current_level_id, 1, 5)
 
 
 func begin_wave(wave_number: int) -> void:
@@ -121,7 +126,18 @@ func get_wave_composition(wave_number: int) -> Array[StringName]:
 				_append_enemies(composition, SWARM_ID, 3 + wave_number)
 			if wave_number % 5 == 0:
 				composition.append(BOSS_ID)
+	_apply_level_composition(composition, wave_number)
 	return composition
+
+
+func _apply_level_composition(
+	composition: Array[StringName],
+	wave_number: int
+) -> void:
+	if level_id == 2 and wave_number >= 2:
+		_append_enemies(composition, ARMORED_ID, 1 + int(wave_number / 4))
+	elif level_id == 4:
+		_append_enemies(composition, SWARM_ID, 2 + int(wave_number / 2))
 
 
 func get_wave_summary(wave_number: int) -> Dictionary:

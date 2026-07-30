@@ -9,9 +9,11 @@ signal next_level_requested
 signal speed_requested(speed: float)
 signal wave_preview_ready
 signal tutorial_skipped
+signal reward_selected(reward_id: StringName)
 
 const WavePreviewPanelScript = preload("res://scripts/wave_preview_panel.gd")
 const TutorialOverlayScript = preload("res://scripts/tutorial_overlay.gd")
+const RewardChoicePanelScript = preload("res://scripts/reward_choice_panel.gd")
 
 var interface_layer: CanvasLayer
 var gold_label: Label
@@ -41,6 +43,8 @@ var boss_health_label: Label
 var boss_progress: ProgressBar
 var tracked_bosses: Array[Node] = []
 var ability_cooldown_duration: float = 25.0
+var reward_layer: CanvasLayer
+var reward_panel: RewardChoicePanel
 
 
 func setup() -> void:
@@ -318,6 +322,29 @@ func hide_tutorial() -> void:
 	tutorial_overlay = null
 
 
+func show_reward_choices(choices: Array[Dictionary]) -> RewardChoicePanel:
+	if is_instance_valid(reward_panel):
+		return reward_panel
+	reward_layer = CanvasLayer.new()
+	reward_layer.layer = 26
+	add_child(reward_layer)
+	reward_panel = RewardChoicePanelScript.new()
+	reward_layer.add_child(reward_panel)
+	reward_panel.setup(choices)
+	reward_panel.reward_selected.connect(
+		func(reward_id: StringName) -> void:
+			reward_selected.emit(reward_id)
+	)
+	return reward_panel
+
+
+func hide_reward_choices() -> void:
+	if is_instance_valid(reward_layer):
+		reward_layer.queue_free()
+	reward_layer = null
+	reward_panel = null
+
+
 func register_boss(enemy: Node) -> void:
 	if not is_instance_valid(enemy) or enemy in tracked_bosses:
 		return
@@ -355,6 +382,9 @@ func _update_boss_bar() -> void:
 		maximum,
 		int(round(health / maximum * 100.0))
 	]
+	var behavior_description: String = String(boss.get("boss_behavior_description"))
+	if not behavior_description.is_empty():
+		boss_name_label.text += "\n" + behavior_description
 
 
 func play_base_feedback() -> void:
@@ -557,6 +587,7 @@ func reset() -> void:
 	wave_preview_layer = null
 	wave_preview_panel = null
 	hide_tutorial()
+	hide_reward_choices()
 	tracked_bosses.clear()
 	if is_instance_valid(boss_bar_container):
 		boss_bar_container.visible = false

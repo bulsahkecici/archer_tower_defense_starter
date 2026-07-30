@@ -40,6 +40,14 @@ var projectile_parent: Node2D
 var invested_gold: int = 0
 var build_spot_index: int = -1
 var target_mode: TargetMode = TargetMode.NEAREST
+var base_damage_stat: float = 0.0
+var base_range_stat: float = 0.0
+var base_fire_interval_stat: float = 0.0
+var stat_modifiers: Dictionary[StringName, Dictionary] = {}
+var active_modifier_descriptions: Dictionary[StringName, String] = {}
+var slowed_target_damage_multiplier: float = 1.0
+var effective_slow_duration: float = 0.0
+var effective_explosion_radius: float = 0.0
 
 
 func _ready() -> void:
@@ -96,7 +104,13 @@ func apply_level_stats() -> void:
 	damage = tower_data.get_damage(level)
 	attack_range = tower_data.get_attack_range(level)
 	fire_interval = tower_data.get_fire_interval(level)
+	base_damage_stat = damage
+	base_range_stat = attack_range
+	base_fire_interval_stat = fire_interval
 	arrow_speed = tower_data.projectile_speed
+	effective_slow_duration = tower_data.slow_duration
+	effective_explosion_radius = tower_data.explosion_radius
+	recalculate_effective_stats()
 	cooldown = minf(cooldown, fire_interval)
 	_queue_visual_redraw()
 
@@ -131,6 +145,65 @@ func play_upgrade_feedback() -> void:
 
 func get_sell_refund() -> int:
 	return tower_data.get_sell_refund(invested_gold) if tower_data != null else 0
+
+
+func set_stat_modifier(
+	key: StringName,
+	damage_multiplier: float = 1.0,
+	range_multiplier: float = 1.0,
+	interval_multiplier: float = 1.0,
+	description: String = ""
+) -> void:
+	stat_modifiers[key] = {
+		"damage": maxf(0.0, damage_multiplier),
+		"range": maxf(0.0, range_multiplier),
+		"interval": maxf(0.05, interval_multiplier)
+	}
+	if not description.is_empty():
+		active_modifier_descriptions[key] = description
+	recalculate_effective_stats()
+
+
+func clear_modifiers_with_prefix(prefix: String) -> void:
+	var keys_to_remove: Array[StringName] = []
+	for key in stat_modifiers:
+		if String(key).begins_with(prefix):
+			keys_to_remove.append(key)
+	for key in keys_to_remove:
+		stat_modifiers.erase(key)
+		active_modifier_descriptions.erase(key)
+	var description_keys: Array[StringName] = []
+	for key in active_modifier_descriptions:
+		if String(key).begins_with(prefix):
+			description_keys.append(key)
+	for key in description_keys:
+		active_modifier_descriptions.erase(key)
+	if prefix == "synergy_":
+		slowed_target_damage_multiplier = 1.0
+	recalculate_effective_stats()
+
+
+func recalculate_effective_stats() -> void:
+	if tower_data == null:
+		return
+	var damage_multiplier: float = 1.0
+	var range_multiplier: float = 1.0
+	var interval_multiplier: float = 1.0
+	for modifier in stat_modifiers.values():
+		damage_multiplier *= float(modifier.get("damage", 1.0))
+		range_multiplier *= float(modifier.get("range", 1.0))
+		interval_multiplier *= float(modifier.get("interval", 1.0))
+	damage = base_damage_stat * damage_multiplier
+	attack_range = base_range_stat * range_multiplier
+	fire_interval = maxf(0.08, base_fire_interval_stat * interval_multiplier)
+	cooldown = minf(cooldown, fire_interval)
+
+
+func get_active_modifier_descriptions() -> Array[String]:
+	var descriptions: Array[String] = []
+	for description in active_modifier_descriptions.values():
+		descriptions.append(description)
+	return descriptions
 
 
 func _ensure_visual_nodes() -> void:
@@ -224,9 +297,11 @@ func _shoot(target: Node2D) -> void:
 	arrow.setup(
 		target, projectile_damage, arrow_speed, heavy_projectile,
 		tower_data.slow_ratio if tower_data != null else 0.0,
-		tower_data.slow_duration if tower_data != null else 0.0,
-		tower_data.explosion_radius if tower_data != null else 0.0,
-		critical_hit
+		effective_slow_duration if tower_data != null else 0.0,
+		effective_explosion_radius if tower_data != null else 0.0,
+		critical_hit,
+		tower_data.id if tower_data != null else &"hero",
+		slowed_target_damage_multiplier
 	)
 	last_projectile = arrow
 

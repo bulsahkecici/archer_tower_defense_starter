@@ -10,6 +10,8 @@ var slow_ratio: float = 0.0
 var slow_duration: float = 0.0
 var explosion_radius: float = 0.0
 var critical: bool = false
+var source_tower_id: StringName = &"hero"
+var slowed_target_damage_multiplier: float = 1.0
 
 func _ready() -> void:
 	add_to_group("projectiles")
@@ -22,7 +24,9 @@ func setup(
 	new_slow_ratio: float = 0.0,
 	new_slow_duration: float = 0.0,
 	new_explosion_radius: float = 0.0,
-	new_critical: bool = false
+	new_critical: bool = false,
+	new_source_tower_id: StringName = &"hero",
+	new_slowed_target_damage_multiplier: float = 1.0
 ) -> void:
 	target = new_target
 	damage = new_damage
@@ -32,6 +36,8 @@ func setup(
 	slow_duration = maxf(0.0, new_slow_duration)
 	explosion_radius = maxf(0.0, new_explosion_radius)
 	critical = new_critical
+	source_tower_id = new_source_tower_id
+	slowed_target_damage_multiplier = maxf(1.0, new_slowed_target_damage_multiplier)
 	set_process(true)
 	queue_redraw()
 
@@ -78,7 +84,13 @@ func _apply_area_damage(center: Vector2) -> void:
 			continue
 		hit_ids[instance_id] = true
 		if enemy.has_method("take_damage"):
-			enemy.take_damage(damage, critical)
+			var effective_damage: float = damage
+			if (
+				source_tower_id == TowerData.BOMB_ID
+				and float(enemy.get("slow_remaining")) > 0.0
+			):
+				effective_damage *= slowed_target_damage_multiplier
+			enemy.take_damage(effective_damage, critical)
 	if not hit_ids.is_empty():
 		get_tree().call_group(
 			"gameplay_root",

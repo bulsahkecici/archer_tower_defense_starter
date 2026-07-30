@@ -29,6 +29,12 @@ var armor_ratio: float = 0.0
 var slow_resistance: float = 0.0
 var slow_ratio: float = 0.0
 var slow_remaining: float = 0.0
+var base_armor_ratio: float = 0.0
+var armor_sources: Dictionary[StringName, float] = {}
+var natural_slow_ratio: float = 0.0
+var natural_slow_active: bool = false
+var level_mechanic_id: int = 1
+var boss_behavior_description: String = ""
 
 func setup(
 	enemy_data: EnemyData,
@@ -48,10 +54,14 @@ func setup(
 	body_radius = maxf(4.0, enemy_data.body_radius)
 	is_boss = enemy_data.is_boss
 	armor_ratio = enemy_data.armor_ratio
+	base_armor_ratio = armor_ratio
+	armor_sources.clear()
 	slow_resistance = enemy_data.slow_resistance
 	slow_ratio = 0.0
 	slow_remaining = 0.0
 	has_resolved = false
+	natural_slow_ratio = 0.0
+	natural_slow_active = false
 	rotates = false
 	loop = false
 	if not is_in_group("enemies"):
@@ -67,7 +77,13 @@ func _process(delta: float) -> void:
 		if slow_remaining <= 0.0:
 			slow_ratio = 0.0
 			queue_redraw()
-	speed = base_speed * (1.0 - slow_ratio)
+	natural_slow_active = (
+		level_mechanic_id == 3
+		and progress_ratio >= 0.35
+		and progress_ratio <= 0.60
+	)
+	natural_slow_ratio = 0.15 if natural_slow_active else 0.0
+	speed = base_speed * (1.0 - maxf(slow_ratio, natural_slow_ratio))
 	var previous_position: Vector2 = global_position
 	progress += speed * delta
 	var movement: Vector2 = global_position - previous_position
@@ -101,6 +117,39 @@ func apply_slow(requested_ratio: float, duration: float) -> void:
 	slow_remaining = maxf(slow_remaining, duration)
 	speed = base_speed * (1.0 - slow_ratio)
 	slow_applied.emit(global_position)
+	queue_redraw()
+
+
+func configure_level_mechanic(current_level_id: int) -> void:
+	level_mechanic_id = clampi(current_level_id, 1, 5)
+
+
+func get_effective_slow_ratio() -> float:
+	return maxf(slow_ratio, natural_slow_ratio)
+
+
+func clear_slow() -> void:
+	slow_ratio = 0.0
+	slow_remaining = 0.0
+	speed = base_speed * (1.0 - natural_slow_ratio)
+	queue_redraw()
+
+
+func add_armor_source(source: StringName, ratio: float) -> void:
+	armor_sources[source] = clampf(ratio, 0.0, 0.8)
+	_recalculate_armor()
+
+
+func remove_armor_source(source: StringName) -> void:
+	armor_sources.erase(source)
+	_recalculate_armor()
+
+
+func _recalculate_armor() -> void:
+	var strongest_bonus: float = 0.0
+	for bonus in armor_sources.values():
+		strongest_bonus = maxf(strongest_bonus, float(bonus))
+	armor_ratio = clampf(base_armor_ratio + strongest_bonus, 0.0, 0.85)
 	queue_redraw()
 
 func resolve_defeated() -> bool:

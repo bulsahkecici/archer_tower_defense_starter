@@ -9,6 +9,8 @@ const WaveManagerScript = preload("res://scripts/wave_manager.gd")
 const VisualEffectScript = preload("res://scripts/visual_effect.gd")
 const UIControllerScript = preload("res://scripts/ui_controller.gd")
 const TowerBuildManagerScript = preload("res://scripts/tower_build_manager.gd")
+const BossBehaviorScript = preload("res://scripts/boss_behavior.gd")
+const RunModifierManagerScript = preload("res://scripts/run_modifier_manager.gd")
 
 const WORLD_SIZE := Vector2(1080.0, 1920.0)
 const STARTING_GOLD := 20
@@ -34,10 +36,13 @@ var tutorial_active: bool = false
 var tutorial_step: int = 0
 var world_shake_tween: Tween
 var damage_number_spawn_count: int = 0
+var reward_pending: bool = false
+var run_modifier_manager: RunModifierManager
 
 var base: DefenseBase
 var archer: ShooterUnit
 var enemy_path: Path2D
+var enemy_paths: Array[Path2D] = []
 var projectiles: Node2D
 var build_spots: Array[Vector2] = []
 var built_spots: Array[bool] = []
@@ -79,6 +84,7 @@ func _ready() -> void:
 	economy.setup(level_data.starting_gold)
 	wave_manager = WaveManagerScript.new()
 	add_child(wave_manager)
+	wave_manager.configure_level(level_data.id)
 
 	_create_world()
 	_create_controllers()
@@ -97,6 +103,17 @@ func _create_world() -> void:
 	enemy_path.set_theme(level_data.map_theme)
 	add_child(enemy_path)
 	move_child(enemy_path, 0)
+	enemy_paths = [enemy_path]
+	if level_data.id == 5:
+		var alternate_path: Path2D = GamePathScript.new()
+		alternate_path.name = "EnemyPathAlternate"
+		alternate_path.curve = _create_curve_from_points(
+			level_data.get_alternate_path_points()
+		)
+		alternate_path.set_theme(level_data.map_theme)
+		add_child(alternate_path)
+		move_child(alternate_path, 1)
+		enemy_paths.append(alternate_path)
 
 	projectiles = Node2D.new()
 	projectiles.name = "Projectiles"
@@ -131,8 +148,11 @@ func _create_controllers() -> void:
 	ui_controller.speed_requested.connect(_set_game_speed)
 	ui_controller.wave_preview_ready.connect(_begin_previewed_wave)
 	ui_controller.tutorial_skipped.connect(_complete_tutorial)
+	ui_controller.reward_selected.connect(_on_reward_selected)
 	ui_controller.set_ability_cooldown_duration(ABILITY_COOLDOWN)
 
+	run_modifier_manager = RunModifierManagerScript.new()
+	add_child(run_modifier_manager)
 	tower_build_manager = TowerBuildManagerScript.new()
 	add_child(tower_build_manager)
 	tower_build_manager.configure_level(
@@ -140,6 +160,7 @@ func _create_controllers() -> void:
 		level_data.build_spot_costs
 	)
 	tower_build_manager.setup(economy, ui_controller.interface_layer, self, projectiles)
+	tower_build_manager.set_run_modifier_manager(run_modifier_manager)
 	tower_build_manager.tower_built.connect(_on_tower_built)
 	tower_build_manager.tower_upgraded.connect(_on_tower_upgraded)
 	tower_build_manager.tower_sold.connect(_on_tower_sold)
@@ -150,9 +171,13 @@ func _create_controllers() -> void:
 	towers = tower_build_manager.towers
 
 func _create_enemy_curve() -> Curve2D:
+	return _create_curve_from_points(level_data.get_path_points())
+
+
+func _create_curve_from_points(points: Array[Vector2]) -> Curve2D:
 	var path_curve := Curve2D.new()
 	path_curve.bake_interval = 12.0
-	for path_point in level_data.get_path_points():
+	for path_point in points:
 		path_curve.add_point(path_point)
 
 	for point_index in range(path_curve.point_count):
@@ -189,7 +214,10 @@ func _process(delta: float) -> void:
 					return
 				intermission = 3.0
 				ui_controller.set_message("Dalga temizlendi!")
+				_open_reward_if_due()
 		WaveManager.WaveState.COMPLETED:
+			if reward_pending:
+				return
 			intermission -= delta
 			if intermission <= 0.0:
 				wave_manager.set_waiting()
@@ -249,7 +277,10 @@ func _spawn_enemy(enemy_id: StringName) -> PathEnemy:
 		return null
 
 	var enemy: PathEnemy = EnemyScript.new()
-	enemy_path.add_child(enemy)
+	var selected_enemy_path: Path2D = enemy_path
+	if enemy_paths.size() > 1 and (wave + active_enemy_count) % 2 == 1:
+		selected_enemy_path = enemy_paths[1]
+	selected_enemy_path.add_child(enemy)
 	enemy.progress = randf_range(0.0, 18.0)
 	enemy.h_offset = randf_range(-38.0, 38.0)
 	enemy.setup(
@@ -259,6 +290,7 @@ func _spawn_enemy(enemy_id: StringName) -> PathEnemy:
 			* lerpf(1.0, level_data.wave_difficulty_multiplier, 0.35),
 		wave_manager.get_reward_bonus(wave, enemy_data.is_boss)
 	)
+	enemy.configure_level_mechanic(level_data.id)
 	enemy.damage_received.connect(_on_enemy_damage_received)
 	enemy.slow_applied.connect(_on_enemy_slow_applied)
 	enemy.defeated.connect(
@@ -272,9 +304,23 @@ func _spawn_enemy(enemy_id: StringName) -> PathEnemy:
 			_on_enemy_reached_base(damage)
 	)
 	if enemy.is_boss:
+		var behavior: BossBehavior = BossBehaviorScript.new()
+		enemy.add_child(behavior)
+		behavior.configure(enemy, self, level_data.id)
 		ui_controller.register_boss(enemy)
 	active_enemy_count += 1
 	return enemy
+
+
+func _spawn_boss_minions(count: int) -> int:
+	if game_over or wave_manager.state == WaveManager.WaveState.GAME_OVER:
+		return 0
+	var spawned: int = 0
+	for _index in range(clampi(count, 0, 8)):
+		var minion: PathEnemy = _spawn_enemy(WaveManager.SWARM_ID)
+		if is_instance_valid(minion):
+			spawned += 1
+	return spawned
 
 
 func _on_enemy_damage_received(
@@ -387,6 +433,35 @@ func _on_tower_sold(world_position: Vector2, _refund: int) -> void:
 	sell_effect.global_position = world_position
 	sell_effect.setup_sell_dust()
 
+
+func _open_reward_if_due() -> bool:
+	if (
+		wave not in RunModifierManager.REWARD_WAVES
+		or game_over
+		or victory_shown
+		or reward_pending
+	):
+		return false
+	reward_pending = true
+	tower_build_manager.input_enabled = false
+	ui_controller.show_reward_choices(
+		run_modifier_manager.get_reward_choices(wave)
+	)
+	return true
+
+
+func _on_reward_selected(reward_id: StringName) -> void:
+	if not reward_pending:
+		return
+	if not run_modifier_manager.apply_reward(reward_id, economy, base, towers):
+		return
+	reward_pending = false
+	ui_controller.hide_reward_choices()
+	tower_build_manager.input_enabled = true
+	tower_build_manager.synergy_manager.recompute(towers)
+	intermission = minf(intermission, 0.15)
+	_update_ui()
+
 func _spawn_floating_gold(world_position: Vector2, reward: int) -> void:
 	var gold_effect := VisualEffectScript.new()
 	add_child(gold_effect)
@@ -427,12 +502,19 @@ func _use_arrow_rain() -> bool:
 		hit_count += 1
 	if hit_count == 0:
 		return false
-	ability_cooldown = ABILITY_COOLDOWN
+	ability_cooldown = _get_ability_cooldown_duration()
 	ui_controller.update_ability_cooldown(ability_cooldown)
 	ui_controller.set_message("Ok Yağmuru!")
 	if tutorial_active and tutorial_step == 3:
 		_complete_tutorial()
 	return true
+
+
+func _get_ability_cooldown_duration() -> float:
+	return maxf(
+		5.0,
+		ABILITY_COOLDOWN - run_modifier_manager.arrow_rain_cooldown_reduction
+	)
 
 
 func _on_bomb_explosion(world_position: Vector2, hit_count: int) -> void:
@@ -539,11 +621,13 @@ func _prepare_restart() -> void:
 	get_tree().paused = false
 	wave = 0
 	wave_preview_pending = false
+	reward_pending = false
 	tutorial_active = false
 	tutorial_step = 0
 	ability_cooldown = 0.0
 	ui_controller.update_ability_cooldown(0.0)
 	wave_manager.reset()
+	run_modifier_manager.reset()
 	economy.setup(level_data.starting_gold)
 	base.reset()
 	queue_redraw()
